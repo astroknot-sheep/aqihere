@@ -4,7 +4,7 @@ import { ArrowUpRight, LoaderCircle, MapPin, Search, X } from "lucide-react";
 import { fetchJSON } from "@/lib/fetch";
 import { validPoint } from "@/lib/geo";
 import type { Point } from "@/lib/types";
-const PLACES: Point[] = [
+export const PLACES: Point[] = [
   { lat: 28.6139, lon: 77.209, name: "New Delhi", country: "India" },
   { lat: 52.52, lon: 13.405, name: "Berlin", country: "Germany" },
   { lat: 51.5074, lon: -0.1278, name: "London", country: "United Kingdom" },
@@ -174,7 +174,7 @@ export default function PlaceSearch({
           aria-label="Places"
         >
           <span className="eyebrow">
-            {query ? "SEARCH RESULTS" : "EXPLORE A PLACE"}
+            {query ? "SEARCH RESULTS" : "SUGGESTED LOCATIONS"}
           </span>
           {results.map((r, i) => (
             <button
@@ -200,7 +200,7 @@ export default function PlaceSearch({
               {error || "No places found. Try another name or coordinates."}
             </p>
           )}
-          {loading && !results.length && <p>Looking for your place…</p>}
+          {loading && !results.length && <p>Searching…</p>}
         </div>
       )}
     </div>

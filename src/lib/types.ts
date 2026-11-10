@@ -3,6 +3,8 @@ export const POLLUTANTS = [
   "pm10",
   "nitrogen_dioxide",
   "ozone",
+  "sulphur_dioxide",
+  "carbon_monoxide",
 ] as const;
 export type Pollutant = (typeof POLLUTANTS)[number];
 export type Concentrations = Partial<Record<Pollutant, number>>;
@@ -11,11 +13,12 @@ export type Point = {
   lon: number;
   name?: string;
   country?: string;
+  accuracyMeters?: number;
 };
 export type StationRecord = {
   id: string;
   name: string;
-  source: "openaq" | "sensor-community";
+  source: "openaq" | "sensor-community" | "berlin-blume";
   lat: number;
   lon: number;
   pollutant: Pollutant;
@@ -26,7 +29,10 @@ export type StationRecord = {
   humidity?: number;
   model_ugm3?: number;
   modelTs?: string;
+  modelAveragingMinutes?: number;
   attribution?: string;
+  coordinateQuality?: "official" | "declared-exact" | "approximate";
+  siteType?: "roadside" | "urban background" | "suburban background";
 };
 export type SourceStatus = {
   source: string;
@@ -40,6 +46,25 @@ export type ValidationMetric = {
   mae: number;
   bias: number;
   modelRmse: number;
+  legacyRmse?: number;
+  modelMae?: number;
+  method?: string;
+  referenceCount?: number;
+  holdoutHours?: number;
+};
+export type EstimatorConfig = {
+  lengthScaleKm: number;
+  prior: number;
+  gain: number;
+  referenceOnly?: boolean;
+  strategy?: "weighted";
+};
+export type Calibration = {
+  algorithm: "robust-residual-v2";
+  generatedAt: string;
+  configs: Partial<Record<Pollutant, EstimatorConfig>>;
+  validation: Partial<Record<Pollutant, ValidationMetric>>;
+  method: string;
 };
 export type StationSnapshot = {
   version: 1;
@@ -49,6 +74,9 @@ export type StationSnapshot = {
   observations: StationRecord[];
   validation: Partial<Record<Pollutant, ValidationMetric>>;
   statuses: SourceStatus[];
+  history?: StationRecord[];
+  calibration?: Calibration;
+  streetObservations?: StationRecord[];
 };
 export type StationResponse = {
   observations: StationRecord[];
@@ -56,6 +84,9 @@ export type StationResponse = {
   generatedAt: string | null;
   statuses: SourceStatus[];
   validation: StationSnapshot["validation"];
+  history?: StationRecord[];
+  calibration?: Calibration;
+  streetObservations?: StationRecord[];
 };
 export type Weather = {
   temperature: number;
@@ -79,4 +110,5 @@ export type EstimateResult = {
   corrections: Concentrations;
   stations: (StationRecord & { distance: number; weight: number })[];
   support: "model" | "limited" | "local";
+  parameters?: Partial<Record<Pollutant, EstimatorConfig>>;
 };

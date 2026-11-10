@@ -1,6 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { qualityControl, clusterCitizens } from "../src/lib/estimate";
-import { validateSnapshot } from "../src/lib/validation";
+import { calibrateWithHistory } from "../src/lib/calibration";
 import type { StationSnapshot } from "../src/lib/types";
 
 async function main() {
@@ -13,11 +13,16 @@ async function main() {
   const records = clusterCitizens(
     qualityControl(snapshot.observations, Date.parse(snapshot.generatedAt)),
   );
+  const calibration = calibrateWithHistory(
+    records,
+    snapshot.history ?? [],
+    Date.parse(snapshot.generatedAt),
+  );
   const report = {
     generatedAt: snapshot.generatedAt,
     region: snapshot.region,
-    method: "Leave one station out; exclude monitors within 1 km",
-    metrics: validateSnapshot(records),
+    method: calibration.method,
+    metrics: calibration.validation,
   };
   if (process.argv[3])
     await writeFile(process.argv[3], JSON.stringify(report, null, 2));

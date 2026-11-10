@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { averagedConcentrations, aqi } from "@/lib/aqi";
+import { averagedConcentrations, aqi, periodMean } from "@/lib/aqi";
+import { calibrate } from "@/lib/calibration";
 import { clusterCitizens, estimate, qualityControl } from "@/lib/estimate";
 import { fetchJSON } from "@/lib/fetch";
 import { distanceKm } from "@/lib/geo";
@@ -58,7 +59,7 @@ export function useAirQuality(
       ]);
       if (controller.signal.aborted) return;
       const [air, weather, stations] = results;
-      const next: Data = {
+      let next: Data = {
         model: air.status === "fulfilled" ? air.value : null,
         weather: weather.status === "fulfilled" ? weather.value : null,
         stationData: stations.status === "fulfilled" ? stations.value : null,
@@ -76,8 +77,12 @@ export function useAirQuality(
       };
       setData(next);
       setLoading(false);
-      if (next.stationData?.observations.length) {
-        const nearby = next.stationData.observations
+      const stationData = next.stationData;
+      if (
+        stationData?.observations.length &&
+        stationData.calibration?.algorithm !== "robust-residual-v2"
+      ) {
+        const nearby = stationData.observations
           .filter((s) => distanceKm(point, s) <= 50)
           .sort(
             (a, b) =>
@@ -85,15 +90,28 @@ export function useAirQuality(
                 (b.quality === "reference" ? -1 : 1) ||
               distanceKm(point, a) - distanceKm(point, b),
           );
+        const ids = new Set([...new Set(nearby.map((s) => s.id))].slice(0, 24));
         setStationsLoading(true);
         try {
           const annotated = await attachModelBaselines(
-            nearby,
+            nearby.filter((s) => ids.has(s.id)),
             controller.signal,
           );
           if (!controller.signal.aborted) {
-            next.stationData = { ...next.stationData, observations: annotated };
-            setData({ ...next });
+            const calibration = calibrate(annotated, Date.now());
+            next = {
+              ...next,
+              stationData: {
+                ...stationData,
+                observations: [
+                  ...annotated,
+                  ...stationData.observations.filter((s) => !ids.has(s.id)),
+                ],
+                calibration,
+                validation: calibration.validation,
+              },
+            };
+            setData(next);
           }
         } catch {
           // Measurements remain visible. Unmatched stations never enter residual correction.
@@ -121,20 +139,42 @@ export function useAirQuality(
       observations,
       now: Date.now(),
       radiusKm: radius,
-      wind: data.weather
-        ? {
-            speed: data.weather.windSpeed,
-            direction: data.weather.windDirection,
-          }
-        : undefined,
+      configs: data.stationData?.calibration?.configs ?? {},
     });
     const modelTime =
       data.model?.time ?? Math.floor(Date.now() / 1000 / 3600) * 3600;
-    const hours = (data.model?.hourly ?? []).map((h) =>
-      h.time === modelTime ? { ...h, values: result.concentrations } : h,
-    );
+    const history = data.stationData?.history ?? [];
+    let correctedHistoryHours = 0;
+    const hours = (data.model?.hourly ?? []).map((h) => {
+      if (h.time === modelTime) return { ...h, values: result.concentrations };
+      if (h.time > modelTime) return h;
+      // Historical hours can use only observations that actually existed by
+      // that hour. Current residuals are never backfilled into the past.
+      const past = history.filter(
+        (s) =>
+          Date.parse(s.ts) <= h.time * 1000 &&
+          h.time * 1000 - Date.parse(s.ts) <= 7200000,
+      );
+      if (!past.length) return h;
+      const corrected = estimate({
+        point,
+        model: h.values,
+        observations: past,
+        now: h.time * 1000,
+        radiusKm: radius,
+        configs: data.stationData?.calibration?.configs ?? {},
+      });
+      if (corrected.stations.length && h.time > modelTime - 24 * 3600)
+        correctedHistoryHours++;
+      return { ...h, values: corrected.concentrations };
+    });
     const average = averagedConcentrations(hours, modelTime, standard);
-    const index = aqi(average, standard, result.concentrations.ozone);
+    const index = aqi(
+      average,
+      standard,
+      result.concentrations.ozone,
+      periodMean(hours, modelTime, "sulphur_dioxide", 24),
+    );
     const forecast = (data.model?.hourly ?? [])
       .filter((h) => h.time >= modelTime && h.time <= modelTime + 24 * 3600)
       .map((h) => ({
@@ -143,9 +183,18 @@ export function useAirQuality(
           averagedConcentrations(data.model!.hourly, h.time, standard),
           standard,
           h.values.ozone,
+          periodMean(data.model!.hourly, h.time, "sulphur_dioxide", 24),
         ),
       }));
-    return { result, index, average, forecast, observations, modelTime };
+    return {
+      result,
+      index,
+      average,
+      forecast,
+      observations,
+      modelTime,
+      correctedHistoryHours,
+    };
   }, [data, point, radius, standard]);
   return { ...data, ...derived, loading, stationsLoading };
 }

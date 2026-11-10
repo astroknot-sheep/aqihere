@@ -1,172 +1,118 @@
 "use client";
+
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState, type KeyboardEvent } from "react";
 import {
-  Activity,
-  ArrowDown,
   ArrowDownToLine,
-  ArrowRight,
   ArrowUpRight,
-  Check,
-  ChevronDown,
   ChevronRight,
-  CircleHelp,
-  Compass,
   Copy,
   Crosshair,
-  Database,
-  Droplets,
-  Earth,
-  ExternalLink,
-  Eye,
-  EyeOff,
-  FlaskConical,
   Github,
   Info,
   Layers,
-  Leaf,
   LoaderCircle,
   MapPin,
   Minus,
   Navigation,
   Plus,
-  Radio,
   RefreshCw,
   Share2,
-  ShieldCheck,
-  SlidersHorizontal,
-  Sparkles,
-  Waves,
-  Wind,
   X,
 } from "lucide-react";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import {
-  aqi,
-  category,
-  COLORS,
-  POLLUTANT_LABEL,
-  SCALE,
-  subIndex,
-} from "@/lib/aqi";
-import { airDensity } from "@/lib/estimate";
-import { coordinates, distanceKm, validPoint } from "@/lib/geo";
+import { category, POLLUTANT_LABEL, SCALE } from "@/lib/aqi";
+import { coordinates, validPoint } from "@/lib/geo";
 import { useAirQuality } from "@/hooks/use-air-quality";
-import { POLLUTANTS, type Point, type Standard } from "@/lib/types";
-import PlaceSearch from "./search";
+import {
+  POLLUTANTS,
+  type Point,
+  type Pollutant,
+  type Standard,
+  type StationRecord,
+} from "@/lib/types";
+import {
+  CurrentPanel,
+  ForecastPanel,
+  ScaleLegend,
+  StationShape,
+  StationsPanel,
+  StreetPanel,
+  type StreetRadius,
+} from "./air-inspector";
+import PlaceSearch, { PLACES } from "./search";
 import { Modal } from "./modal";
 
 const AirMap = dynamic(() => import("./air-map"), {
   ssr: false,
   loading: () => (
-    <div className="map-loading">
-      <Earth size={32} />
-      <span>Finding your place in the world…</span>
+    <div className="map-loading" role="status">
+      Loading map…
     </div>
   ),
 });
-const INITIAL: Point = {
-  lat: 28.6139,
-  lon: 77.209,
-  name: "New Delhi",
-  country: "India",
-};
-const DESCRIPTIONS = {
-  pm2_5: "Fine particles",
-  pm10: "Coarse particles",
-  nitrogen_dioxide: "Nitrogen dioxide",
-  ozone: "Ground-level ozone",
-};
 const REPO = "https://github.com/astroknot-sheep/aqihere";
-const SOURCE_LINKS = [
+const TABS = [
+  { id: "current", label: "Current" },
+  { id: "stations", label: "Stations" },
+  { id: "street", label: "Street" },
+  { id: "forecast", label: "Forecast" },
+] as const;
+type Panel = (typeof TABS)[number]["id"];
+const SOURCES = [
   {
-    title: "Open-Meteo & CAMS",
-    detail: "Atmospheric model · CC BY 4.0",
+    label: "CAMS via Open-Meteo",
+    detail: "Regional atmospheric model · CC BY 4.0",
     url: "https://open-meteo.com/en/docs/air-quality-api",
   },
   {
-    title: "Sensor.Community",
-    detail: "Community monitors · ODbL",
+    label: "Land Berlin · BLUME",
+    detail: "Hourly reference measurements · dl-de-by-2.0",
+    url: "https://daten.berlin.de/datensaetze/luftdaten-berlin",
+  },
+  {
+    label: "Sensor.Community",
+    detail: "Outdoor community sensors · ODbL",
     url: "https://sensor.community/en/",
   },
   {
-    title: "OpenAQ",
-    detail: "Optional reference monitors · provider licenses",
+    label: "OpenAQ",
+    detail: "Optional monitoring feed · provider licences",
     url: "https://openaq.org/",
   },
   {
-    title: "OpenStreetMap",
-    detail: "Map data and community-hosted tiles · ODbL",
+    label: "OpenStreetMap",
+    detail: "Map tiles and geographic data",
     url: "https://www.openstreetmap.org/copyright",
   },
 ];
-function IconLogo() {
-  return (
-    <span className="brand-icon">
-      <MapPin size={23} strokeWidth={1.65} />
-      <span />
-    </span>
-  );
-}
-function formatTime(time: number, zone?: string, compact = false) {
-  return new Date(time * 1000).toLocaleTimeString("en", {
-    hour: "numeric",
-    ...(compact ? {} : { minute: "2-digit" }),
-    hour12: true,
-    timeZone: zone || "UTC",
-  });
-}
 
 export default function Explorer() {
-  const [point, setPoint] = useState<Point>(INITIAL);
-  const [radius, setRadius] = useState(25);
+  const [point, setPoint] = useState<Point>(PLACES[0]);
   const [standard, setStandard] = useState<Standard>("us");
-  const [revision, setRevision] = useState(0);
-  const [tab, setTab] = useState<"overview" | "stations">("overview");
-  const [modal, setModal] = useState<"method" | "sources" | "share" | null>(
-    null,
-  );
+  const [radius, setRadius] = useState(25);
+  const [streetRadius, setStreetRadius] = useState<StreetRadius>(100);
+  const [panel, setPanel] = useState<Panel>("current");
+  const [mobileDetails, setMobileDetails] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [showStations, setShowStations] = useState(true);
   const [terrain, setTerrain] = useState(false);
-  const [settings, setSettings] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const [locating, setLocating] = useState(false);
+  const [dialog, setDialog] = useState<"methods" | "sources" | "share" | null>(
+    null,
+  );
+  const [toast, setToast] = useState("");
+  const [shareUrl, setShareUrl] = useState("");
+  const [urlLoaded, setUrlLoaded] = useState(false);
   const [mapAction, setMapAction] = useState<{
     type: "in" | "out" | "center";
     id: number;
   } | null>(null);
-  const [locating, setLocating] = useState(false);
-  const [toast, setToast] = useState("");
-  const [copied, setCopied] = useState(false);
-  const [shareUrl, setShareUrl] = useState("");
-  const [isMobile, setIsMobile] = useState(false);
-  const [mobileView, setMobileView] = useState<"map" | "details">("map");
-  const settingsRef = useRef<HTMLDivElement>(null);
   const air = useAirQuality(point, radius, standard, revision);
-  const status = category(air.index.value, standard);
-  const stationCount = new Set(air.result.stations.map((s) => s.id)).size;
-  const stations = useMemo(
-    () =>
-      [...new Map(air.observations.map((s) => [s.id, s])).values()].sort(
-        (a, b) => distanceKm(point, a) - distanceKm(point, b),
-      ),
-    [air.observations, point],
-  );
-  const density = air.weather ? airDensity(air.weather) : null;
-  const nearest = stations[0] ? distanceKm(point, stations[0]) : null;
-  const zone = air.model?.timezone ?? "UTC";
-  const avgNote =
-    standard === "eu"
-      ? "Hourly concentrations · EEA 2025 bands"
-      : standard === "india"
-        ? "24h PM & NO₂ · 8h O₃ · indicative"
-        : "24h PM · 8h O₃ · 1h NO₂ · indicative";
+  const stationCount = new Set(air.observations.map((s) => s.id)).size;
+  const state = category(air.index.value, standard);
+  const index = air.index.aboveRange ? "400+" : (air.index.value ?? "—");
+
   useEffect(() => {
     const query = window.matchMedia("(max-width: 760px)");
     const update = () => setIsMobile(query.matches);
@@ -178,82 +124,104 @@ export default function Explorer() {
     const params = new URLSearchParams(window.location.search);
     const lat = Number(params.get("lat")),
       lon = Number(params.get("lon"));
-    if (params.has("lat") && params.has("lon") && validPoint(lat, lon))
-      setPoint({ lat, lon, name: "Shared location" });
+    if (params.has("lat") && params.has("lon") && validPoint(lat, lon)) {
+      setPoint(
+        PLACES.find((p) => p.lat === lat && p.lon === lon) ?? {
+          lat,
+          lon,
+          name: "Selected location",
+        },
+      );
+    }
     const scale = params.get("scale");
     if (scale === "us" || scale === "india" || scale === "eu")
       setStandard(scale);
-    const r = Number(params.get("radius"));
-    if (r >= 5 && r <= 50) setRadius(r);
+    const distance = Number(params.get("radius"));
+    if (distance >= 5 && distance <= 50) setRadius(distance);
+    const street = Number(params.get("street"));
+    if (street === 10 || street === 25 || street === 50 || street === 100) {
+      setStreetRadius(street);
+      setPanel("street");
+    }
+    setUrlLoaded(true);
   }, []);
   useEffect(() => {
+    if (!urlLoaded) return;
     const url = new URL(window.location.href);
-    url.search = new URLSearchParams({
-      lat: point.lat.toFixed(4),
-      lon: point.lon.toFixed(4),
+    const params = new URLSearchParams({
+      lat: point.lat.toFixed(6),
+      lon: point.lon.toFixed(6),
       scale: standard,
       radius: String(radius),
-    }).toString();
+    });
+    if (panel === "street") params.set("street", String(streetRadius));
+    url.search = params.toString();
     window.history.replaceState({}, "", url);
     setShareUrl(url.toString());
-  }, [point, standard, radius]);
+  }, [point, standard, radius, panel, streetRadius, urlLoaded]);
   useEffect(() => {
     if (!toast) return;
-    const timer = setTimeout(() => setToast(""), 4500);
+    const timer = setTimeout(() => setToast(""), 5000);
     return () => clearTimeout(timer);
   }, [toast]);
-  useEffect(() => {
-    const close = (e: MouseEvent) => {
-      if (
-        settingsRef.current &&
-        !settingsRef.current.contains(e.target as Node)
-      )
-        setSettings(false);
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, []);
-  const select = (p: Point) => {
-    setPoint(p);
+  function select(point: Point) {
+    setPoint(point);
     setRevision(0);
-  };
-  const geoLocate = () => {
+  }
+  function inspectStation(station: StationRecord) {
+    select({ lat: station.lat, lon: station.lon, name: station.name });
+    setStreetRadius(100);
+    setPanel("street");
+    setMobileDetails(true);
+  }
+  function moveMap(type: "in" | "out" | "center") {
+    setMapAction({ type, id: Date.now() });
+  }
+  function locate() {
     if (!navigator.geolocation) {
       setToast(
-        "Your browser doesn’t support location. Search for a place instead.",
+        "Location services are unavailable. Enter coordinates or choose a map point.",
       );
       return;
     }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
-      (p) => {
+      ({ coords }) => {
         select({
-          lat: p.coords.latitude,
-          lon: p.coords.longitude,
+          lat: coords.latitude,
+          lon: coords.longitude,
           name: "Your location",
+          accuracyMeters: coords.accuracy,
         });
-        setMapAction({ type: "center", id: Date.now() });
+        moveMap("center");
         setLocating(false);
       },
       () => {
         setLocating(false);
         setToast(
-          "Location couldn’t be accessed. You can search for your city or drop a pin.",
+          "Location was unavailable. Choose a map point or search for an address.",
         );
       },
-      { timeout: 10000, maximumAge: 60000, enableHighAccuracy: false },
+      { timeout: 10000, maximumAge: 30000, enableHighAccuracy: true },
     );
-  };
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    } catch {
-      setToast("Select and copy the link from the share window.");
-    }
-  };
-  const download = () => {
+  }
+  function tabKey(event: KeyboardEvent<HTMLButtonElement>, i: number) {
+    const next =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? TABS.length - 1
+          : event.key === "ArrowRight"
+            ? (i + 1) % TABS.length
+            : event.key === "ArrowLeft"
+              ? (i + TABS.length - 1) % TABS.length
+              : null;
+    if (next === null) return;
+    event.preventDefault();
+    setPanel(TABS[next].id);
+    document.getElementById(`tab-${TABS[next].id}`)?.focus();
+  }
+  function download() {
     if (!air.model) return;
     const rows = [
       [
@@ -273,11 +241,11 @@ export default function Explorer() {
         point.lon,
         new Date(air.modelTime * 1000).toISOString(),
         standard,
-        air.index.value ?? "",
+        air.index.value === null ? "" : index,
         p,
         air.result.concentrations[p] ?? "",
         air.average[p] ?? "",
-        stationCount,
+        new Set(air.result.stations.map((s) => s.id)).size,
         air.stationData?.tier ?? "model",
       ]),
     ];
@@ -289,1070 +257,513 @@ export default function Explorer() {
     const url = URL.createObjectURL(
       new Blob([csv], { type: "text/csv;charset=utf-8" }),
     );
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `aqihere-${point.lat.toFixed(3)}-${point.lon.toFixed(3)}.csv`;
-    anchor.click();
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "aqihere.csv";
+    link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setToast("Your air-quality data was exported.");
-  };
-  const sourceSummary = stationCount
-    ? `${stationCount} nearby ${stationCount === 1 ? "monitor" : "monitors"} informed this estimate.`
-    : "CAMS atmospheric model. No usable nearby station correction.";
+    setToast("CSV exported.");
+  }
+
   return (
     <div className="app-shell">
       <header className="site-header">
         <a className="brand" href="/" aria-label="AQIHere home">
-          <IconLogo />
-          <span>
-            aqihere<span className="brand-extension">.earth</span>
-          </span>
+          <MapPin size={23} />
+          <strong>AQIHere</strong>
+          <span className="brand-context">Air quality map</span>
         </a>
-        <div className="header-tagline">
-          <span className="tiny-line" /> The air around you, understood.
-        </div>
-        <nav aria-label="Main navigation">
-          <button className="text-button" onClick={() => setModal("method")}>
-            How it works <ArrowUpRight size={15} />
+        <nav aria-label="Map and data controls">
+          <label className="standard-select">
+            <span className="sr-only">AQI standard</span>
+            <select
+              value={standard}
+              onChange={(e) => setStandard(e.target.value as Standard)}
+            >
+              <option value="us">US AQI</option>
+              <option value="india">India AQI</option>
+              <option value="eu">EU bands</option>
+            </select>
+          </label>
+          <button
+            className="header-button"
+            onClick={() => setDialog("methods")}
+          >
+            <Info size={17} />
+            <span>Methods</span>
           </button>
           <a
-            className="github-link"
+            className="icon-button github-link"
             href={REPO}
             target="_blank"
             rel="noreferrer"
-            aria-label="View open-source project on GitHub"
+            aria-label="Source code on GitHub"
           >
             <Github size={19} />
           </a>
-          <span className="header-separator" />
-          <span className="free-badge">
-            <span className="live-dot" /> Free & open
-          </span>
         </nav>
       </header>
-      <main className={`workspace mobile-${mobileView}`}>
+      <main
+        className={`workspace ${mobileDetails ? "mobile-details" : "mobile-map"}`}
+      >
         <aside
-          className="sidebar"
-          inert={isMobile && mobileView === "map"}
-          aria-hidden={isMobile && mobileView === "map"}
-          aria-label="Air quality at selected location"
+          className="inspector"
+          aria-label="Selected location data"
+          inert={isMobile && !mobileDetails}
         >
-          <div className="sidebar-scroll">
-            <div className="sidebar-eyebrow">
-              <span className="eyebrow">
-                <Compass size={13} /> AIR QUALITY EXPLORER
-              </span>
+          <div className="inspector-heading">
+            <div className="section-heading">
+              <span className="eyebrow">Selected location</span>
               <button
-                className="bare-button mobile-close"
-                aria-label="Show map"
-                onClick={() => setMobileView("map")}
+                className="outline-button mobile-back"
+                onClick={() => setMobileDetails(false)}
               >
-                <X size={19} />
+                Map
+                <ChevronRight size={16} />
               </button>
-              <span className="desktop-only">01 / YOUR LOCATION</span>
             </div>
-            <div className="location-heading">
-              <h1>{point.name ?? "Dropped pin"}</h1>
-              <p>
-                <MapPin size={13} />
-                {point.country ?? "Your selected spot on Earth"}
+            <h1>{point.name ?? "Dropped pin"}</h1>
+            {point.country && <p className="muted">{point.country}</p>}
+            <div className="location-meta">
+              <span>{coordinates(point, panel === "street" ? 6 : 4)}</span>
+              <div>
+                <button
+                  className="icon-button"
+                  aria-label="Share selected point"
+                  onClick={() => setDialog("share")}
+                >
+                  <Share2 size={16} />
+                </button>
+                <button
+                  className="icon-button"
+                  aria-label="Refresh readings"
+                  disabled={air.loading}
+                  onClick={() => setRevision((n) => n + 1)}
+                >
+                  <RefreshCw size={16} />
+                </button>
+              </div>
+            </div>
+            {point.accuracyMeters !== undefined && (
+              <p className="small-copy">
+                Device position accuracy ±{Math.round(point.accuracyMeters)} m
               </p>
-            </div>
-            <div className="coordinate-row">
-              <span>{coordinates(point)}</span>
-              <button
-                className="bare-button"
-                aria-label="Share this location"
-                onClick={() => setModal("share")}
-              >
-                <Share2 size={15} />
-              </button>
-            </div>
-            <div
-              className="panel-tabs"
-              role="tablist"
-              aria-label="Air-quality details"
-            >
-              <button
-                role="tab"
-                aria-selected={tab === "overview"}
-                aria-controls="overview-panel"
-                id="overview-tab"
-                className={tab === "overview" ? "active" : ""}
-                onClick={() => setTab("overview")}
-              >
-                Overview
-              </button>
-              <button
-                role="tab"
-                aria-selected={tab === "stations"}
-                aria-controls="stations-panel"
-                id="stations-tab"
-                className={tab === "stations" ? "active" : ""}
-                onClick={() => setTab("stations")}
-              >
-                Nearby stations <span>{stations.length}</span>
-              </button>
-            </div>
-            {air.errors.length > 0 && (
-              <div
-                className={`data-warning ${!air.model ? "data-error" : ""}`}
-                role="status"
-              >
-                <Info size={15} />
-                <span>{air.errors[0]}</span>
-                <button
-                  className="bare-button"
-                  aria-label="Retry data sources"
-                  onClick={() => setRevision((r) => r + 1)}
-                >
-                  <RefreshCw size={15} />
-                </button>
-              </div>
             )}
-            {tab === "overview" ? (
-              <div
-                role="tabpanel"
-                id="overview-panel"
-                aria-labelledby="overview-tab"
-              >
-                <section
-                  className={`aqi-card ${air.loading ? "is-loading" : ""}`}
-                  style={{ "--aqi-color": status.color } as React.CSSProperties}
-                  aria-busy={air.loading}
-                  aria-live="polite"
-                >
-                  <div className="card-topline">
-                    <span className="eyebrow">AIR QUALITY INDEX</span>
-                    <label className="standard-select">
-                      <span className="sr-only">AQI standard</span>
-                      <select
-                        value={standard}
-                        onChange={(e) =>
-                          setStandard(e.target.value as Standard)
-                        }
-                      >
-                        <option value="us">US AQI</option>
-                        <option value="india">India AQI</option>
-                        <option value="eu">EU band</option>
-                      </select>
-                      <ChevronDown size={12} />
-                    </label>
-                  </div>
-                  <div className="aqi-reading">
-                    <div className="aqi-number">
-                      {air.loading ? (
-                        <span className="number-placeholder">···</span>
-                      ) : (
-                        (air.index.value ?? "—")
-                      )}
-                      {standard === "eu" && air.index.value !== null && (
-                        <small>/6</small>
-                      )}
-                    </div>
-                    <div className="aqi-word">
-                      <span className="category-pill">
-                        <span />
-                        {air.loading ? "Checking the air" : status.label}
-                      </span>
-                      <span>
-                        {air.loading
-                          ? "A clearer picture is on its way"
-                          : air.index.dominant
-                            ? `${POLLUTANT_LABEL[air.index.dominant]} is the main contributor`
-                            : "Try refreshing this location"}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="aqi-spectrum">
-                    <div>
-                      {COLORS.map((c) => (
-                        <span key={c} style={{ background: c }} />
-                      ))}
-                    </div>
-                    <span
-                      className="spectrum-pointer"
-                      style={{
-                        left: `${air.index.value === null ? 0 : Math.min(98, Math.max(2, ((status.index + 0.5) / 6) * 100))}%`,
-                      }}
-                    />
-                  </div>
-                  <div className="spectrum-labels">
-                    <span>Good</span>
-                    <span>
-                      {standard === "india"
-                        ? "Severe"
-                        : standard === "eu"
-                          ? "Extremely poor"
-                          : "Hazardous"}
-                    </span>
-                  </div>
-                  <div className="estimate-badge">
-                    <Sparkles size={13} />
-                    <span>
-                      {air.loading
-                        ? "Gathering open data"
-                        : stationCount
-                          ? "Station-informed estimate"
-                          : "Model estimate"}
-                    </span>
-                    <button
-                      className="bare-button"
-                      aria-label="About this estimate"
-                      onClick={() => setModal("method")}
-                    >
-                      <CircleHelp size={13} />
-                    </button>
-                  </div>
-                </section>
-                <p className="averaging-note">
-                  {avgNote}
-                  <br />
-                  Four-pollutant estimate; not an official station AQI.
-                </p>
-                <section className="pollutants-section">
-                  <div className="section-heading">
-                    <h2>What’s in the air</h2>
-                    <span>Current · µg/m³</span>
-                  </div>
-                  <div className="pollutant-list">
-                    {POLLUTANTS.map((p, i) => {
-                      const value = air.result.concentrations[p];
-                      const color = category(
-                        subIndex(p, value ?? NaN, standard),
-                        standard,
-                      ).color;
-                      return (
-                        <div key={p} className="pollutant-row">
-                          <span className={`pollutant-symbol symbol-${i}`}>
-                            {POLLUTANT_LABEL[p]}
-                          </span>
-                          <div className="pollutant-name">
-                            <strong>{DESCRIPTIONS[p]}</strong>
-                            <span>
-                              {p === air.index.dominant
-                                ? "Main contributor to index"
-                                : "Current concentration"}
-                            </span>
-                          </div>
-                          <strong className="pollutant-value">
-                            {air.loading ? "—" : (value?.toFixed(1) ?? "—")}
-                          </strong>
-                          <span
-                            className="pollutant-indicator"
-                            style={{ background: color }}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-                <section className="conditions-section">
-                  <div className="section-heading">
-                    <h2>The local atmosphere</h2>
-                    <Wind size={15} />
-                  </div>
-                  <div className="condition-grid">
-                    <div>
-                      <Navigation
-                        size={18}
-                        style={{
-                          transform: `rotate(${(air.weather?.windDirection ?? 0) + 180 - 45}deg)`,
-                        }}
-                      />
-                      <strong>
-                        {air.weather
-                          ? (air.weather.windSpeed * 3.6).toFixed(1)
-                          : "—"}
-                        <small> km/h</small>
-                      </strong>
-                      <span>Wind speed</span>
-                    </div>
-                    <div>
-                      <Droplets size={18} />
-                      <strong>
-                        {air.weather ? Math.round(air.weather.humidity) : "—"}
-                        <small> %</small>
-                      </strong>
-                      <span>Humidity</span>
-                    </div>
-                    <div>
-                      <Waves size={18} />
-                      <strong>
-                        {density?.toFixed(2) ?? "—"}
-                        <small> kg/m³</small>
-                      </strong>
-                      <span>Air density</span>
-                    </div>
-                  </div>
-                </section>
-                <button
-                  className="transparency-card"
-                  onClick={() => setModal("sources")}
-                >
-                  <span className="transparency-icon">
-                    <ShieldCheck size={21} strokeWidth={1.6} />
-                  </span>
-                  <span>
-                    <strong>Open data. The full picture.</strong>
-                    <small>
-                      {air.loading
-                        ? "Checking model and station coverage…"
-                        : sourceSummary}
-                    </small>
-                    <em>
-                      See the sources <ArrowUpRight size={12} />
-                    </em>
-                  </span>
-                </button>
-              </div>
-            ) : (
-              <section
-                role="tabpanel"
-                id="stations-panel"
-                aria-labelledby="stations-tab"
-                className="stations-panel"
-              >
-                <div className="section-heading">
-                  <h2>Monitors around your pin</h2>
-                  <Radio size={16} />
-                </div>
-                <p className="muted-copy">
-                  Measurements belong to each monitor’s location. Your pin’s air
-                  quality is still an estimate.
-                </p>
-                <div className="radius-setting">
-                  <label htmlFor="station-radius">
-                    Search radius <strong>{radius} km</strong>
-                  </label>
-                  <input
-                    id="station-radius"
-                    type="range"
-                    min="5"
-                    max="50"
-                    step="5"
-                    value={radius}
-                    onChange={(e) => setRadius(Number(e.target.value))}
-                  />
-                  <div>
-                    <span>5 km</span>
-                    <span>50 km</span>
-                  </div>
-                </div>
-                {air.loading || air.stationsLoading ? (
-                  <div className="empty-stations">
-                    <LoaderCircle size={28} className="spin" />
-                    <h3>Looking for nearby monitors</h3>
-                    <p>
-                      Checking fresh station data and matching model values.
-                    </p>
-                  </div>
-                ) : !stations.length ? (
-                  <div className="empty-stations">
-                    <span className="empty-icon">
-                      <Radio size={30} strokeWidth={1.2} />
-                    </span>
-                    <h3>A little off the sensor grid.</h3>
-                    <p>
-                      No fresh monitors were found within {radius} km. CAMS
-                      still gives you an atmospheric model estimate here.
-                    </p>
-                    <button
-                      className="small-outline"
-                      onClick={() =>
-                        select({
-                          lat: 52.52,
-                          lon: 13.405,
-                          name: "Berlin",
-                          country: "Germany",
-                        })
-                      }
-                    >
-                      Explore Berlin <ArrowUpRight size={14} />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="station-list">
-                    {stations.map((s) => {
-                      const used = air.result.stations.some(
-                        (u) => u.id === s.id,
-                      );
-                      const age = Math.max(
-                        0,
-                        Math.round((Date.now() - Date.parse(s.ts)) / 60000),
-                      );
-                      const values = air.observations.filter(
-                        (v) => v.id === s.id,
-                      );
-                      return (
-                        <article className="station-card" key={s.id}>
-                          <div>
-                            <span
-                              className={`station-source ${s.quality === "reference" ? "reference" : ""}`}
-                            >
-                              <Radio size={11} />
-                              {s.quality === "reference"
-                                ? "Reference"
-                                : "Community"}
-                            </span>
-                            <span>
-                              {distanceKm(point, s).toFixed(1)} km away
-                            </span>
-                          </div>
-                          <h3>{s.name}</h3>
-                          <div className="station-values">
-                            {values.map((v) => (
-                              <span key={v.pollutant}>
-                                {POLLUTANT_LABEL[v.pollutant]}{" "}
-                                <strong>{v.value_ugm3.toFixed(1)}</strong>
-                              </span>
-                            ))}
-                            <small>µg/m³</small>
-                          </div>
-                          <p>
-                            {s.averagingMinutes
-                              ? `${s.averagingMinutes} min average`
-                              : "Provider averaging period unspecified"}{" "}
-                            · {age} min ago
-                          </p>
-                          <footer>
-                            <span className={used ? "used" : ""}>
-                              {used ? <Check size={12} /> : <Info size={12} />}
-                              {used
-                                ? "Used for residual correction"
-                                : "Shown as context; baseline unavailable"}
-                            </span>
-                            <a
-                              href={
-                                s.source === "openaq"
-                                  ? `https://explore.openaq.org/locations/${s.id.replace("oa-", "")}`
-                                  : "https://maps.sensor.community/"
-                              }
-                              target="_blank"
-                              rel="noreferrer"
-                              aria-label={`View ${s.name} at source`}
-                            >
-                              <ExternalLink size={13} />
-                            </a>
-                          </footer>
-                        </article>
-                      );
-                    })}
-                  </div>
-                )}
-                <div className="station-explainer">
-                  <Info size={15} />
-                  <p>
-                    Fresh means under 2 hours old. High-humidity and implausible
-                    citizen-sensor readings are filtered where the required data
-                    exist.
-                  </p>
-                </div>
-              </section>
-            )}
-            <div className="sidebar-footer">
-              <span className={`live-dot ${air.loading ? "pulsing" : ""}`} />
-              <span>
-                {air.loading
-                  ? "Loading current conditions"
-                  : air.model
-                    ? `Model valid at ${formatTime(air.modelTime, zone)}`
-                    : "Data unavailable"}
-              </span>
-              <button
-                className="bare-button"
-                aria-label="Refresh air quality"
-                disabled={air.loading}
-                onClick={() => setRevision((r) => r + 1)}
-              >
-                <RefreshCw size={13} className={air.loading ? "spin" : ""} />
-              </button>
-            </div>
           </div>
-          <footer className="project-footer">
-            <Leaf size={13} /> Made for a more breathable world.
-            <button onClick={() => setModal("sources")}>
-              Credits <ArrowUpRight size={10} />
+          <div className="panel-tabs" role="tablist" aria-label="Location data">
+            {TABS.map((tab, i) => (
+              <button
+                key={tab.id}
+                id={`tab-${tab.id}`}
+                role="tab"
+                type="button"
+                aria-controls={`panel-${tab.id}`}
+                aria-selected={panel === tab.id}
+                tabIndex={panel === tab.id ? 0 : -1}
+                onKeyDown={(e) => tabKey(e, i)}
+                onClick={() => setPanel(tab.id)}
+              >
+                {tab.label}
+                {tab.id === "stations" && stationCount > 0 && (
+                  <small>{stationCount}</small>
+                )}
+              </button>
+            ))}
+          </div>
+          <div
+            className="inspector-scroll"
+            role="tabpanel"
+            id={`panel-${panel}`}
+            aria-labelledby={`tab-${panel}`}
+            tabIndex={0}
+          >
+            {air.errors.length > 0 && (
+              <p className="data-warning" role="status">
+                <Info size={16} />
+                {air.errors[0]}
+              </p>
+            )}
+            {panel === "current" && (
+              <CurrentPanel
+                air={air}
+                standard={standard}
+                onSources={() => setDialog("sources")}
+              />
+            )}
+            {panel === "stations" && (
+              <StationsPanel
+                air={air}
+                point={point}
+                radius={radius}
+                onRadius={setRadius}
+                onInspect={inspectStation}
+              />
+            )}
+            {panel === "street" && (
+              <StreetPanel
+                air={air}
+                point={point}
+                radius={streetRadius}
+                standard={standard}
+                onRadius={setStreetRadius}
+                onInspect={inspectStation}
+              />
+            )}
+            {panel === "forecast" && (
+              <ForecastPanel air={air} standard={standard} />
+            )}
+          </div>
+          <footer className="inspector-footer">
+            <button className="text-link" onClick={() => setDialog("sources")}>
+              Data sources
+            </button>
+            <button
+              className="text-link"
+              onClick={download}
+              disabled={!air.model}
+            >
+              <ArrowDownToLine size={15} />
+              CSV
             </button>
           </footer>
         </aside>
         <section
           className="map-section"
-          inert={isMobile && mobileView === "details"}
-          aria-hidden={isMobile && mobileView === "details"}
-          aria-label="Interactive air-quality map"
+          aria-label="Air quality map"
+          inert={isMobile && mobileDetails}
         >
           <AirMap
             point={point}
             onPoint={select}
+            onInspect={inspectStation}
             radius={radius}
             stations={air.observations}
-            standard={standard}
-            color={status.color}
+            streetRadius={panel === "street" ? streetRadius : null}
             showStations={showStations}
             terrain={terrain}
             mapAction={mapAction}
+            zone={air.model?.timezone ?? "UTC"}
           />
-          <div className="map-topbar">
+          <div className="map-toolbar">
             <PlaceSearch onSelect={select} />
-            <div className="map-top-actions">
+            <div className="map-actions">
               <button
-                className="location-button"
-                onClick={geoLocate}
-                disabled={locating}
+                className="icon-button"
                 aria-label="Use my location"
+                title="Use my location"
+                disabled={locating}
+                onClick={locate}
               >
                 {locating ? (
-                  <LoaderCircle size={18} className="spin" />
+                  <LoaderCircle size={19} className="spin" />
                 ) : (
                   <Crosshair size={19} />
                 )}
-                <span>Locate me</span>
               </button>
-              <div ref={settingsRef} className="settings-wrapper">
-                <button
-                  className={`icon-button settings-trigger ${settings ? "active" : ""}`}
-                  aria-label="Map settings"
-                  aria-expanded={settings}
-                  onClick={() => setSettings((s) => !s)}
+              <details className="layers-menu">
+                <summary
+                  className="icon-button"
+                  aria-label="Map layers"
+                  title="Map layers"
                 >
-                  <SlidersHorizontal size={18} />
-                </button>
-                {settings && (
-                  <div className="map-settings">
-                    <div className="section-heading">
-                      <h2>Make it your map</h2>
-                      <button
-                        className="bare-button"
-                        aria-label="Close map settings"
-                        onClick={() => setSettings(false)}
-                      >
-                        <X size={15} />
-                      </button>
-                    </div>
-                    <label className="toggle-row">
-                      <span>
-                        <Radio size={16} />
-                        Nearby monitors
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={showStations}
-                        onChange={(e) => setShowStations(e.target.checked)}
-                      />
-                      <span className="toggle-visual" />
-                    </label>
-                    <label className="toggle-row">
-                      <span>
-                        <Layers size={16} />
-                        Detailed street map
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={terrain}
-                        onChange={(e) => setTerrain(e.target.checked)}
-                      />
-                      <span className="toggle-visual" />
-                    </label>
-                    <div className="radius-setting">
-                      <label htmlFor="map-radius">
-                        Station radius <strong>{radius} km</strong>
-                      </label>
-                      <input
-                        id="map-radius"
-                        type="range"
-                        min="5"
-                        max="50"
-                        step="5"
-                        value={radius}
-                        onChange={(e) => setRadius(Number(e.target.value))}
-                      />
-                    </div>
-                    <label className="settings-standard">
-                      Index standard
-                      <select
-                        value={standard}
-                        onChange={(e) =>
-                          setStandard(e.target.value as Standard)
-                        }
-                      >
-                        <option value="us">US AQI</option>
-                        <option value="india">India AQI</option>
-                        <option value="eu">European bands</option>
-                      </select>
-                    </label>
-                  </div>
-                )}
-              </div>
+                  <Layers size={19} />
+                </summary>
+                <div className="layers-panel">
+                  <strong>Map layers</strong>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={showStations}
+                      onChange={(e) => setShowStations(e.target.checked)}
+                    />{" "}
+                    Monitoring stations
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={terrain}
+                      onChange={(e) => setTerrain(e.target.checked)}
+                    />{" "}
+                    Detailed streets
+                  </label>
+                </div>
+              </details>
             </div>
           </div>
-          <div className="map-instruction">
-            <span>
-              <MapPin size={14} />
-            </span>{" "}
-            A world of air. <strong>Drop a pin to explore.</strong>
+          <div className="map-scale-note">
+            {panel === "street"
+              ? `${streetRadius} m inspection radius`
+              : `${radius} km monitor search`}
+            <span> · Click the map to move the pin</span>
           </div>
-          <div className="coverage-tag">
-            <Earth size={13} />
-            <span>GLOBAL COVERAGE</span>
-          </div>
-          <div className="map-zoom">
+          <div className="map-zoom" aria-label="Map navigation">
             <button
+              className="icon-button"
               aria-label="Zoom in"
-              onClick={() => setMapAction({ type: "in", id: Date.now() })}
+              onClick={() => moveMap("in")}
             >
-              <Plus size={18} />
+              <Plus size={20} />
             </button>
             <button
+              className="icon-button"
               aria-label="Zoom out"
-              onClick={() => setMapAction({ type: "out", id: Date.now() })}
+              onClick={() => moveMap("out")}
             >
-              <Minus size={18} />
+              <Minus size={20} />
             </button>
-            <span />
             <button
-              aria-label="Center map on selected pin"
-              onClick={() => setMapAction({ type: "center", id: Date.now() })}
+              className="icon-button"
+              aria-label="Center selected point"
+              onClick={() => moveMap("center")}
             >
-              <Navigation size={17} />
+              <Navigation size={18} />
             </button>
           </div>
-          <div className="map-bottom">
-            <div className="map-bottom-meta">
-              <button
-                className="basemap-button"
-                onClick={() => setTerrain((t) => !t)}
-              >
-                <span
-                  className={`basemap-thumbnail ${terrain ? "detailed" : ""}`}
-                >
-                  <Layers size={18} />
-                </span>
-                <span>
-                  {terrain ? "Street map" : "Light map"}
-                  <ChevronDown size={12} />
-                </span>
-              </button>
-              <div className="map-legend">
-                <span className="legend-title">{SCALE[standard].label}</span>
-                <div>
-                  {COLORS.map((c, i) => (
-                    <span
-                      key={c}
-                      title={SCALE[standard].names[i]}
-                      style={{ background: c }}
-                    />
-                  ))}
-                </div>
-                <span>
-                  Good <ArrowRight size={10} />{" "}
-                  {standard === "india"
-                    ? "Severe"
-                    : standard === "eu"
-                      ? "Extremely poor"
-                      : "Hazardous"}
-                </span>
-              </div>
-              <span className="map-measurement-note">
-                <span className="legend-station-dot" />
-                Station dots show measured concentrations
-              </span>
+          <details className="map-legend">
+            <summary>Map legend</summary>
+            <div className="legend-body">
+              <ul className="marker-legend">
+                <li>
+                  <StationShape kind="point" />
+                  Selected point
+                </li>
+                <li>
+                  <StationShape kind="reference" />
+                  Reference monitor
+                </li>
+                <li>
+                  <StationShape kind="community" />
+                  Community sensor
+                </li>
+              </ul>
+              <h2>{SCALE[standard].label} categories</h2>
+              <ScaleLegend standard={standard} />
             </div>
-            <section className="forecast-card">
-              <div className="forecast-heading">
-                <div>
-                  <span className="eyebrow">A LOOK AHEAD</span>
-                  <h2>
-                    Your next 24 hours
-                    <span> · {point.name ?? "This location"}</span>
-                  </h2>
-                </div>
-                <div className="forecast-actions">
-                  <span>
-                    <span className="forecast-line" />
-                    CAMS forecast
-                  </span>
-                  <button
-                    className="icon-button"
-                    onClick={download}
-                    disabled={!air.model}
-                    aria-label="Export current air-quality data as CSV"
-                  >
-                    <ArrowDownToLine size={17} />
-                  </button>
-                </div>
-              </div>
-              <div className="forecast-chart">
-                {air.forecast.length ? (
-                  <ResponsiveContainer
-                    width="100%"
-                    height="100%"
-                    minHeight={92}
-                  >
-                    <AreaChart
-                      data={air.forecast}
-                      margin={{ top: 8, right: 12, left: -20, bottom: 0 }}
-                    >
-                      <defs>
-                        <linearGradient
-                          id="forecast-fill"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop
-                            offset="0%"
-                            stopColor="#628b6b"
-                            stopOpacity={0.2}
-                          />
-                          <stop
-                            offset="100%"
-                            stopColor="#628b6b"
-                            stopOpacity={0.015}
-                          />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid
-                        stroke="#e3e7de"
-                        vertical={false}
-                        strokeDasharray="2 4"
-                      />
-                      <XAxis
-                        dataKey="time"
-                        tickFormatter={(t) =>
-                          formatTime(t, zone, true)
-                            .replace(" ", "")
-                            .toLowerCase()
-                        }
-                        ticks={air.forecast
-                          .filter((_, i) => i % 6 === 0)
-                          .map((h) => h.time)}
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fontSize: 10, fill: "#8b948b" }}
-                        minTickGap={35}
-                        dy={8}
-                      />
-                      <YAxis
-                        domain={standard === "eu" ? [1, 6] : [0, "auto"]}
-                        tickCount={3}
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fontSize: 10, fill: "#8b948b" }}
-                        allowDecimals={false}
-                      />
-                      <Tooltip
-                        content={({ active, payload }) =>
-                          active && payload?.length ? (
-                            <div className="chart-tooltip">
-                              <span>
-                                {formatTime(payload[0].payload.time, zone)}
-                              </span>
-                              <strong>
-                                {payload[0].value} {SCALE[standard].label}
-                              </strong>
-                              <small>Model forecast</small>
-                            </div>
-                          ) : null
-                        }
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="value"
-                        stroke="#628b6b"
-                        strokeWidth={2}
-                        fill="url(#forecast-fill)"
-                        isAnimationActive={false}
-                        connectNulls={false}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="chart-empty">
-                    {air.loading ? (
-                      <>
-                        <LoaderCircle size={17} className="spin" />
-                        Preparing your forecast…
-                      </>
-                    ) : (
-                      "Forecast unavailable for this location."
-                    )}
-                  </div>
-                )}
-              </div>
-              <div className="forecast-caption">
-                <span>
-                  <Info size={11} />
-                  Model forecast · local time ({zone.replaceAll("_", " ")})
-                </span>
-                <span>Open data. Clearer decisions.</span>
-              </div>
-            </section>
+          </details>
+          <div className="mobile-summary">
+            <button
+              className="mobile-current"
+              onClick={() => {
+                setPanel("current");
+                setMobileDetails(true);
+              }}
+            >
+              <strong style={{ borderLeftColor: state.color }}>
+                {air.loading ? "—" : index}
+              </strong>
+              <span>
+                <b>{point.name ?? "Dropped pin"}</b>
+                <small>
+                  {air.loading
+                    ? "Loading"
+                    : `${state.label} · ${SCALE[standard].label}`}
+                </small>
+              </span>
+              <ChevronRight size={18} />
+            </button>
+            <button
+              className="mobile-street"
+              onClick={() => {
+                setPanel("street");
+                setMobileDetails(true);
+              }}
+            >
+              <MapPin size={17} />
+              Street
+            </button>
           </div>
-          <button
-            className="mobile-summary"
-            onClick={() => setMobileView("details")}
-          >
-            <span className="mobile-aqi" style={{ color: status.color }}>
-              {air.loading ? "···" : (air.index.value ?? "—")}
-            </span>
-            <span>
-              <strong>{point.name ?? "Dropped pin"}</strong>
-              <small>
-                {air.loading
-                  ? "Checking the air…"
-                  : `${status.label} · ${SCALE[standard].label}`}
-              </small>
-            </span>
-            <span className="mobile-details-label">
-              Details <ChevronRight size={17} />
-            </span>
-          </button>
         </section>
       </main>
       {toast && (
         <div className="toast" role="status">
-          <Info size={16} />
           {toast}
           <button
-            aria-label="Dismiss notification"
-            className="bare-button"
+            className="icon-button"
+            aria-label="Dismiss message"
             onClick={() => setToast("")}
           >
-            <X size={15} />
+            <X size={16} />
           </button>
         </div>
       )}
       <Modal
-        open={modal === "method"}
-        onOpenChange={(o) => !o && setModal(null)}
-        title="A clearer picture of the air."
-        description="Open data, a transparent method, and room for uncertainty."
+        open={dialog === "methods"}
+        onOpenChange={(open) => !open && setDialog(null)}
+        title="Methods"
+        description="How readings and estimates are calculated."
       >
-        <div className="method-steps">
-          <article>
-            <span>01</span>
-            <div>
-              <h3>Start with the atmosphere.</h3>
-              <p>
-                CAMS, delivered by Open-Meteo, provides a model at every pin.
-                Its grid is about 11 km in Europe and 45 km globally. A pin is
-                precise; the underlying model is regional.
-              </p>
-            </div>
-          </article>
-          <article>
-            <span>02</span>
-            <div>
-              <h3>Let nearby monitors add context.</h3>
-              <p>
-                Fresh readings are compared with the model at each station’s
-                observation hour. Distance, freshness, source quality and a
-                modest wind factor determine how much their residuals adjust
-                current concentrations. Without matched readings, the model
-                stays unchanged.
-              </p>
-            </div>
-          </article>
-          <article>
-            <span>03</span>
-            <div>
-              <h3>Calculate the index last.</h3>
-              <p>
-                US and Indian particulate indices use rolling 24-hour model
-                concentrations, with 8-hour ozone. Only the current hour can
-                receive a fresh station correction. US NO₂ uses 1 hour; India
-                uses 24. EU bands use hourly concentrations and the EEA’s 2025
-                revision.
-              </p>
-            </div>
-          </article>
-        </div>
-        <div className="method-callout">
-          <FlaskConical size={22} />
-          <div>
-            <strong>Honest about what we know.</strong>
-            <p>
-              This is an indicative index for four pollutants, not an official
-              AQI or a measurement at your pin. SO₂ and CO are not included. US
-              ozone includes the 1-hour sub-index when its concentration reaches
-              the applicable range. Density and AOD are diagnostics. No accuracy
-              improvement or calibrated uncertainty is claimed without
-              validation.
-            </p>
-          </div>
-        </div>
-        <div className="method-links">
-          <a
-            href="https://aqs.epa.gov/aqsweb/documents/codetables/aqi_breakpoints.html"
-            target="_blank"
-            rel="noreferrer"
-          >
-            EPA breakpoints <ArrowUpRight size={12} />
-          </a>
-          <a
-            href="https://airindex.eea.europa.eu/AQI/"
-            target="_blank"
-            rel="noreferrer"
-          >
-            EEA methodology <ArrowUpRight size={12} />
-          </a>
-          <a
-            href="https://www.airquality.cpcb.gov.in/ccr_docs/About_AQI.pdf"
-            target="_blank"
-            rel="noreferrer"
-          >
-            CPCB methodology <ArrowUpRight size={12} />
-          </a>
-          <a href={REPO} target="_blank" rel="noreferrer">
-            Explore the code <ArrowUpRight size={12} />
-          </a>
-        </div>
-      </Modal>
-      <Modal
-        open={modal === "sources"}
-        onOpenChange={(o) => !o && setModal(null)}
-        title="Every estimate has a story."
-        description="Here is the data behind your selected location."
-      >
-        <div className="source-current">
-          <div>
-            <Database size={18} />
-            <strong>
-              {stationCount
-                ? "Station-informed estimate"
-                : "CAMS model estimate"}
-            </strong>
-          </div>
-          <p>{sourceSummary}</p>
-          <span>
-            {stationCount} contributing monitors
-            {nearest !== null
-              ? ` · nearest measurement ${nearest.toFixed(1)} km away`
-              : ""}{" "}
-            ·{" "}
-            {air.stationData?.tier === "snapshot"
-              ? "Scheduled snapshot"
-              : air.stationData?.tier === "live"
-                ? "Live fallback"
-                : "Model fallback"}
-          </span>
-        </div>
-        <div className="source-status-list">
-          <div>
-            <span>
-              <span className={`live-dot ${!air.model ? "inactive" : ""}`} />
-              Air-quality model
-            </span>
-            <strong>{air.model ? "Available" : "Unavailable"}</strong>
-          </div>
-          <div>
-            <span>
-              <span className={`live-dot ${!air.weather ? "inactive" : ""}`} />
-              Weather model
-            </span>
-            <strong>{air.weather ? "Available" : "Unavailable"}</strong>
-          </div>
-          {air.stationData?.statuses.map((s, i) => (
-            <div key={`${s.source}:${i}`}>
-              <span>
-                <span
-                  className={`live-dot ${s.status !== "ok" ? "inactive" : ""}`}
-                />
-                {s.source}
-              </span>
-              <strong title={s.detail}>
-                {s.status === "ok" ? `${s.latencyMs} ms` : s.status}
-              </strong>
-            </div>
-          ))}
-        </div>
-        <div className="diagnostics">
-          <span>
-            Aerosol optical depth{" "}
-            <strong>{air.model?.aod?.toFixed(2) ?? "—"}</strong>
-          </span>
-          <span>
-            Model elevation{" "}
-            <strong>
-              {air.model?.elevation ?? air.weather?.elevation ?? "—"} m
-            </strong>
-          </span>
-        </div>
-        <div className="validation-note">
-          <Activity size={17} />
-          <div>
-            <strong>Uncertainty is not yet calibrated here.</strong>
-            <p>
-              {air.stationData?.validation.pm2_5
-                ? `Snapshot PM₂.₅ spatial holdout: RMSE ${air.stationData.validation.pm2_5.rmse.toFixed(1)} µg/m³, ${air.stationData.validation.pm2_5.count} monitors; model-only RMSE ${air.stationData.validation.pm2_5.modelRmse.toFixed(1)} µg/m³. This is a diagnostic, not a prediction interval.`
-                : "No regional validation result is available for this pin. A station count is coverage information, not an accuracy percentage."}
-            </p>
-          </div>
-        </div>
-        <h3 className="sources-credit-heading">Standing on open data</h3>
-        <div className="source-links">
-          {SOURCE_LINKS.map((s) => (
-            <a key={s.title} href={s.url} target="_blank" rel="noreferrer">
-              <span>
-                <strong>{s.title}</strong>
-                <small>{s.detail}</small>
-              </span>
-              <ArrowUpRight size={17} />
+        <div className="method-content">
+          <h3>Regional estimate</h3>
+          <p>
+            CAMS supplies the background field. Available grid spacing is about
+            11 km in Europe and 45 km globally. Monitor readings are matched to
+            the same averaging window. The selected correction uses distance and
+            freshness. Where the reference record is long enough, it is tested
+            on later hours at withheld monitors.
+          </p>
+          <h3>Street measurements</h3>
+          <p>
+            The Street tab searches 10–100 m around the pin. It uses published
+            positions, reports distance and sampling time, and derives a station
+            index from that station’s completed hourly history. Reliable
+            estimates between monitors require a validated dispersion model with
+            local emissions, wind and building geometry.
+          </p>
+          <h3>Index periods</h3>
+          <p>
+            US particulate estimates use EPA PM NowCast. Ozone and CO use 8-hour
+            windows, and NO₂ and SO₂ use hourly inputs with the EPA
+            high-concentration rules. India uses rolling 24-hour particles, NO₂
+            and SO₂, plus 8-hour ozone and CO. EU bands use hourly
+            concentrations.
+          </p>
+          <div className="method-links">
+            <a
+              className="text-link"
+              href="https://document.airnow.gov/technical-assistance-document-for-the-reporting-of-daily-air-quailty.pdf"
+              target="_blank"
+              rel="noreferrer"
+            >
+              EPA AQI methods
+              <ArrowUpRight size={13} />
             </a>
-          ))}
+            <a
+              className="text-link"
+              href="https://airindex.eea.europa.eu/AQI/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              EEA index
+              <ArrowUpRight size={13} />
+            </a>
+            <a
+              className="text-link"
+              href="https://acp.copernicus.org/articles/24/807/2024/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Street dispersion research
+              <ArrowUpRight size={13} />
+            </a>
+          </div>
         </div>
-        <p className="license-note">
-          CAMS data © European Union, via Copernicus Atmosphere Monitoring
-          Service and Open-Meteo, CC BY 4.0. Open-Meteo’s free API is for
-          non-commercial use. Sensor.Community data are ODbL. Station-specific
-          OpenAQ provider credits are preserved in the snapshot.
-        </p>
       </Modal>
       <Modal
-        open={modal === "share"}
-        onOpenChange={(o) => !o && setModal(null)}
-        title="Share a little clarity."
-        description="Send this pin, index standard and search radius to someone."
+        open={dialog === "sources"}
+        onOpenChange={(open) => !open && setDialog(null)}
+        title="Data sources and validation"
+        description="Coverage and recent validation for the selected location."
       >
-        <div className="share-preview">
-          <MapPin size={23} />
-          <div>
-            <strong>{point.name ?? "Your selected location"}</strong>
-            <span>{coordinates(point)}</span>
-          </div>
-          <span className="share-index" style={{ color: status.color }}>
-            {air.index.value ?? "—"}
-          </span>
+        <div className="method-content">
+          <h3>Regional data</h3>
+          <p>
+            {air.stationData?.tier === "snapshot"
+              ? "Scheduled station snapshot"
+              : air.stationData?.tier === "live"
+                ? "Live community station lookup"
+                : "CAMS model"}
+            . {air.correctedHistoryHours} of the prior 24 hours have usable
+            station support.
+          </p>
+          {air.stationData?.statuses.length ? (
+            <ul className="source-status">
+              {air.stationData.statuses.map((s, i) => (
+                <li key={`${s.source}-${i}`}>
+                  <strong>{s.source}</strong>
+                  <span>{s.status === "ok" ? "Available" : s.status}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <h3>Spatial validation</h3>
+          <p>
+            {air.stationData?.calibration?.method ??
+              "Regional validation is unavailable for this point."}
+          </p>
+          {Object.entries(air.stationData?.validation ?? {}).length > 0 && (
+            <table className="data-table">
+              <caption className="sr-only">
+                Spatial holdout errors in micrograms per cubic metre
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Pollutant</th>
+                  <th scope="col">Holdout RMSE</th>
+                  <th scope="col">CAMS RMSE</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(air.stationData?.validation ?? {}).map(
+                  ([p, m]) => (
+                    <tr key={p}>
+                      <th scope="row">
+                        {POLLUTANT_LABEL[p as Pollutant]}
+                        <small>
+                          {m.count} targets
+                          {m.referenceCount
+                            ? ` · ${m.referenceCount} reference`
+                            : ""}
+                          {m.holdoutHours ? ` · ${m.holdoutHours} hours` : ""}
+                        </small>
+                      </th>
+                      <td>{m.rmse.toFixed(1)}</td>
+                      <td>{m.modelRmse.toFixed(1)}</td>
+                    </tr>
+                  ),
+                )}
+              </tbody>
+            </table>
+          )}
+          <h3>Providers</h3>
+          <ul className="source-links">
+            {SOURCES.map((s) => (
+              <li key={s.label}>
+                <a
+                  className="text-link"
+                  href={s.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {s.label}
+                  <ArrowUpRight size={13} />
+                </a>
+                <span>{s.detail}</span>
+              </li>
+            ))}
+          </ul>
         </div>
-        <label className="share-label" htmlFor="share-link">
-          Link to this location
-        </label>
+      </Modal>
+      <Modal
+        open={dialog === "share"}
+        onOpenChange={(open) => !open && setDialog(null)}
+        title="Share location"
+        description="The link preserves the coordinates and selected index standard."
+      >
         <div className="share-input">
           <input
-            id="share-link"
+            aria-label="Location link"
             readOnly
             value={shareUrl}
             onFocus={(e) => e.target.select()}
           />
-          <button className="primary-button" onClick={copy}>
-            {copied ? <Check size={16} /> : <Copy size={16} />}{" "}
-            {copied ? "Copied" : "Copy"}
+          <button
+            className="outline-button"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(shareUrl);
+                setToast("Link copied.");
+              } catch {
+                setToast("Select the link and copy it.");
+              }
+            }}
+          >
+            <Copy size={16} />
+            Copy
           </button>
         </div>
-        <p className="share-note">
-          The link loads fresh data when opened. It doesn’t preserve the current
-          readings.
-        </p>
-        <button
-          className="export-button"
-          onClick={download}
-          disabled={!air.model}
-        >
-          <ArrowDownToLine size={17} />
-          <span>Export current readings as CSV</span>
-          <ArrowUpRight size={16} />
+        <button className="text-link" onClick={download} disabled={!air.model}>
+          <ArrowDownToLine size={16} />
+          Export current readings
         </button>
       </Modal>
     </div>

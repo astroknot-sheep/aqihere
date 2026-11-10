@@ -41,6 +41,7 @@ jobs:
           mkdir -p data
           cp "$SNAPSHOT_DIR/stations.json" data/stations.json
           cp "$SNAPSHOT_DIR/validation.json" data/validation.json
+          cp "$SNAPSHOT_DIR/baseline-cache.json" data/baseline-cache.json
           git add data
           if git diff --staged --quiet; then exit 0; fi
           git commit -m 'Refresh regional station snapshot'

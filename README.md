@@ -1,8 +1,6 @@
 # AQIHere.earth
 
-**The air around you, understood.** A free, open-source, map-first air-quality explorer built with Next.js 15, React 19, TypeScript, Leaflet, Tailwind CSS, Radix Dialog and Recharts. MIT application code; upstream data retain their own licenses.
-
-AQIHere.earth is the brand name. A custom `.earth` domain is not registered by this project. Vercel provides the actual hosting URL.
+A free, open-source air-quality map built with Next.js, React, TypeScript and Leaflet. [Open the map](https://aqihere.vercel.app/).
 
 ## Run locally
 
@@ -13,75 +11,36 @@ npm ci
 npm run dev
 ```
 
-Open `http://127.0.0.1:3000`. The app works without keys. It fetches Open-Meteo air-quality and weather data **directly from the browser**, geocodes place searches, and uses a CDN-cached Sensor.Community bounding-box fallback for stations.
+Open `http://127.0.0.1:3000`. See `.env.example` for optional settings. Standalone snapshot scripts use process environment variables. OpenAQ keys belong in the snapshot runner's environment.
 
-Optional configuration is in `.env.example`. Copy to `.env.local` for Next.js. Standalone snapshot scripts read environment variables from the process, not automatically from `.env.local`. Never expose the OpenAQ key through `NEXT_PUBLIC_` variables.
+## Regional estimates
 
-## Included
+The map shows indicative US and Indian AQI and European air-quality bands. CAMS provides a regional field at approximately 11 km grid spacing in Europe and 45 km globally. PM₂.₅, PM₁₀, NO₂, O₃, SO₂ and CO are available where the source provides them. The EEA bands use five pollutants. The Indian index uses six of the eight CPCB pollutants and omits NH₃ and lead.
 
-- Click or drag a map pin, search places or coordinates, or explicitly request browser geolocation.
-- US AQI, Indian AQI, and revised European category bands; concentration interpolation happens before index calculation.
-- Rolling model concentration windows: US 24h PM, 8h O3 plus high-ozone 1h sub-index, 1h NO2; India 24h PM/NO2 and 8h O3; EU hourly.
-- Current pollutant concentrations, wind, humidity, moist-air density, AOD and elevation diagnostics.
-- Fresh nearby monitor measurements, reference/citizen labels, distance, age, averaging period and correction participation.
-- Snapshot → live citizen fallback → CAMS-only fallback, source switches and source diagnostics.
-- 24-hour model forecast, shareable pin links, CSV export, desktop map and mobile detail sheet.
-- Pure residual estimator, quality control, leave-one-station-out validation, automated snapshot collection and CI.
+The US particulate calculation uses the EPA PM NowCast over the last 12 clock hours. Ozone and CO use 8-hour averages, and NO₂ and SO₂ use hourly values with the high-concentration rules. US ozone uses a rolling 8-hour mean and the high-concentration 1-hour sub-index. India uses rolling 24-hour PM, NO₂ and SO₂ and 8-hour O₃ and CO. The EEA bands use hourly values.
 
-## Scientific scope
+A monitor residual is the measured concentration minus the model average over the same sampling window. Corrections weight residuals by distance, source quality and freshness. When the reference history supports it, earlier hours are used to fit and select a correction and later hours are held out for evaluation. Every held-out monitor and observations within 1 km are excluded from its spatial prediction. Sparse areas use spatial folds and can retain CAMS if the correction fails validation. Forecasts use CAMS. Current corrections to past hours use measurements available at those hours.
 
-The result is an **indicative four-pollutant index**. It omits SO2 and CO, is not an official AQI, and is not a direct measurement at a pin. The map can be precise while the model grid is regional (~11 km Europe, ~45 km globally).
+The Sources panel reports the data tier, held-out sample count and errors. These tests measure performance at withheld stations over the available sample. Establishing accuracy between stations would require longer independent evaluation and validated inputs for dispersion at that scale.
 
-For each usable observation, `residual = observed concentration − model concentration at that station and observation hour`. The estimator applies an exponentially decaying residual field, shrunk by a zero-residual CAMS prior. Default length scale: 15 km. Source quality, freshness and a bounded wind factor adjust residual weights. Wind is meteorological FROM direction; its influence fades in calm conditions. These parameters are explicitly heuristic, not locally calibrated.
+## Street measurements
 
-Only the **current model hour** is adjusted by fresh readings. Historical hours remain modeled; current PM correction therefore affects only one sample of a 24h PM index. Forecasts remain CAMS-only. This avoids silently projecting a current sensor residual across historical or future hours. Changing radius can change current concentrations without greatly changing the rolling daily index.
+The Street tab searches 10, 25, 50 or 100 metres from the pin for recent outdoor observations with published station coordinates or community coordinates marked exact. The radius includes device position uncertainty when the pin comes from geolocation. The tab displays distance, site type, sampling window and concentrations at each instrument. Where an hourly reference series is available it also derives a station index from that instrument's measurements.
 
-Citizen data are clustered by approximately 1 km cells, represented by a median observation, downweighted relative to references, checked for implausible values, stale timestamps and neighbor outliers. RH ≥85% is excluded **only when co-located RH exists**; no undocumented humidity correction is invented. Live readings are 5 min observations; scheduled citizen snapshots use 1h averages. OpenAQ latest records have unspecified provider averaging periods and are labeled accordingly.
-
-Density and AOD are displayed, not used as accuracy multipliers. Confidence percentages and prediction intervals are deliberately absent. A holdout report compares residual correction against raw CAMS; it does not establish external accuracy or a calibrated uncertainty band. The validation excludes all monitors within 1 km of a held-out monitor to reduce spatial leakage. Independent reference validation over multiple dates is still needed.
+Berlin has hourly reference data from BLUME. Each result describes the monitor's location, with roadside and background stations labeled separately. Places without an eligible monitor in range can use the regional view. A street-level concentration field between instruments requires local emissions, street and building geometry, meteorology and independent validation. [Berlin open data](https://daten.berlin.de/datensaetze/luftdaten-berlin) · [Street dispersion research](https://acp.copernicus.org/articles/24/807/2024/)
 
 ## Station snapshots
 
-The default launch snapshot is **Berlin region** (`west,south,east,north = 12.9,52.25,13.9,52.8`). The opening map is New Delhi; places outside snapshot coverage use live citizen stations or CAMS. Change the launch region via GitHub repository variables `SNAPSHOT_BBOX` and `SNAPSHOT_REGION`.
+The default snapshot covers the Berlin region. Set `SNAPSHOT_BBOX` (west, south, east, north) and `SNAPSHOT_REGION` as GitHub Actions variables to change coverage. The workflow runs on a ten-minute schedule subject to Actions delays. It collects the hourly Berlin reference feed, the Sensor.Community bulk feed and optional OpenAQ readings, prioritizes references among up to 96 modeled stations, and publishes snapshot, baseline-cache and validation JSON to the `snapshots` branch. Snapshots older than two hours fall back to live community stations or CAMS. CAMS baselines are reused for up to one hour to limit provider calls.
 
-The scheduled GitHub Actions workflow runs about every ten minutes, subject to Actions scheduling delays. It:
-
-1. Downloads Sensor.Community's bulk 1h feed once.
-2. Optionally discovers up to 12 OpenAQ locations using a bounding box and fetches their latest values. Configure the free key as the repository Actions secret `OPENAQ_API_KEY`; do not put it in Vercel or client code.
-3. Normalizes units to µg/m³, filters and clusters readings, caps the region at 32 monitor IDs and fetches their matching CAMS baselines in batches of 12.
-4. Runs spatial holdout validation, publishes `data/stations.json` and `data/validation.json` to the `snapshots` branch, and preserves the previous published snapshot if every source fails.
-
-The cap keeps the worst-case station model baseline workload around 4,608 coordinate requests/day at 144 scheduled runs, before provider accounting factors. OpenAQ uses at most 13 calls/run (1,872/day). Quotas can change; inspect usage before expanding the region. Snapshots older than 2h are rejected. Snapshot and live fetches have independent timeouts; a source failure never substitutes fabricated readings.
-
-Point Vercel's `STATION_SNAPSHOT_URL` at:
-
-```text
-https://raw.githubusercontent.com/astroknot-sheep/aqihere/snapshots/data/stations.json
-```
-
-You can also host that compact file on GitHub Pages. A separately paid Blob store is unnecessary. The `snapshots` branch is excluded from Vercel Git deployments in `vercel.json`.
-
-Run manually:
+Set `STATION_SNAPSHOT_URL` on Vercel to the published snapshot URL. Set `ENABLE_SENSOR_COMMUNITY=false` on Vercel to disable live community lookups. Configure `OPENAQ_API_KEY` as a GitHub Actions secret to enable OpenAQ collection. Check provider usage and terms before increasing coverage.
 
 ```bash
 npm run snapshot
-npm run validate -- work/snapshots/stations.json work/snapshots/replay-report.json
-```
-
-The API route rounds lookup centers to 0.1° and includes an approximately 60 km margin. Only sensor discovery is bucketed: the **pin stays exact** for distance calculation and model requests (the provider itself resolves to a grid). API responses use `s-maxage=300, stale-while-revalidate=300`, upstream Next fetch caching uses 300s, and a bounded browser memory cache deduplicates model results for 5 min by ~0.01° buckets. There is no promise of durable server memory caching. Source status and latency are logged server-side; CDN cache headers are supplied by Vercel.
-
-## Checks and deployment
-
-```bash
+npm run benchmark -- work/snapshots/stations.json work/snapshots/replay-report.json
 npm test
 npm run typecheck
 npm run build
 ```
 
-CI runs tests and a production build. The calculation tests cover current EPA PM breakpoints, EEA revision, Indian endpoints, gas unit conversion, rolling windows and missing data, bounded residual correction, meteorological wind direction, density, sensor QC and spatial holdout leakage.
-
-Import this repository into Vercel with the Next.js framework preset and Node 24. No required environment variables. Add the optional snapshot URL for precomputed station coverage. Set `ENABLE_SENSOR_COMMUNITY=false` to disable live station lookups. In Actions, set `ENABLE_OPENAQ=false` or omit its key to disable OpenAQ. The first snapshot can be triggered from GitHub Actions → Refresh regional station snapshot → Run workflow.
-
-Public API input is validated. No personal location is collected automatically or persisted; clicking Locate me explicitly invokes the browser's location permission. Model and geocoding requests go to Open-Meteo, station lookups go through the app server, map tile requests go to OpenStreetMap. Shared URLs contain the chosen coordinates. There are no accounts, analytics, paid services, database or tracking cookies.
-
-See [NOTICE.md](NOTICE.md) for required attribution, provider licenses, non-commercial API/hosting terms and tile usage constraints.
+The pin's coordinates appear in a shared URL. Browser geolocation runs after the user requests it. Model and geocoding requests use Open-Meteo, station lookups go through the app server, and tiles use OpenStreetMap. See [NOTICE.md](NOTICE.md) for provider attribution and terms.

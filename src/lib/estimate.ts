@@ -6,6 +6,7 @@ import {
   type Point,
   type StationRecord,
   type Weather,
+  type EstimatorConfig,
 } from "./types";
 
 export function airDensity(
@@ -20,7 +21,7 @@ export function airDensity(
   return (pressure - vapor) / (287.058 * kelvin) + vapor / (461.495 * kelvin);
 }
 
-export function estimate(input: {
+export function legacyEstimate(input: {
   point: Point;
   model: Concentrations;
   observations: StationRecord[];
@@ -109,6 +110,8 @@ export function qualityControl(
     pm10: 2000,
     nitrogen_dioxide: 2000,
     ozone: 1500,
+    sulphur_dioxide: 3000,
+    carbon_monoxide: 100000,
   };
   const valid = records.filter(
     (s) =>
@@ -164,4 +167,129 @@ export function clusterCitizens(records: StationRecord[]): StationRecord[] {
     result.push(values[Math.floor(values.length / 2)]);
   }
   return result;
+}
+
+export const MODEL_ONLY: EstimatorConfig = {
+  lengthScaleKm: 15,
+  prior: 1,
+  gain: 0,
+};
+export const DEFAULT_CONFIG: EstimatorConfig = {
+  lengthScaleKm: 15,
+  prior: 1,
+  gain: 0.5,
+};
+const median = (values: number[]) => {
+  const a = [...values].sort((a, b) => a - b);
+  return a.length % 2
+    ? a[Math.floor(a.length / 2)]
+    : (a[a.length / 2 - 1] + a[a.length / 2]) / 2;
+};
+
+/** Robust, bounded residual interpolation. Weather is not an accuracy multiplier:
+ * the previous unvalidated wind factor is deliberately absent from v2. */
+export function estimate(input: {
+  point: Point;
+  model: Concentrations;
+  observations: StationRecord[];
+  now: number;
+  radiusKm?: number;
+  configs?: Partial<Record<(typeof POLLUTANTS)[number], EstimatorConfig>>;
+  lengthScaleKm?: number;
+  wind?: { speed: number; direction: number };
+}): EstimateResult {
+  const { point, model, now, radiusKm = 25 } = input;
+  const concentrations = { ...model },
+    corrections: Concentrations = {};
+  const stations: EstimateResult["stations"] = [];
+  const latest = new Map<string, StationRecord>();
+  for (const s of input.observations) {
+    if (!s.averagingMinutes || s.modelAveragingMinutes !== s.averagingMinutes)
+      continue;
+    const age = (now - Date.parse(s.ts)) / 3600000;
+    if (
+      !Number.isFinite(age) ||
+      age < -0.25 ||
+      age > 2 ||
+      !Number.isFinite(s.model_ugm3) ||
+      !Number.isFinite(s.value_ugm3) ||
+      s.value_ugm3 < 0 ||
+      !s.modelTs ||
+      !Number.isFinite(Date.parse(s.modelTs)) ||
+      Math.abs(Date.parse(s.modelTs) - Date.parse(s.ts)) > 3600000
+    )
+      continue;
+    const key = `${s.id}:${s.pollutant}`;
+    if (!latest.has(key) || Date.parse(s.ts) > Date.parse(latest.get(key)!.ts))
+      latest.set(key, s);
+  }
+  for (const pollutant of POLLUTANTS) {
+    if (!Number.isFinite(model[pollutant])) continue;
+    const config = input.configs
+      ? (input.configs[pollutant] ?? MODEL_ONLY)
+      : DEFAULT_CONFIG;
+    if (config.gain <= 0) {
+      corrections[pollutant] = 0;
+      continue;
+    }
+    const candidates = [...latest.values()]
+      .filter(
+        (s) =>
+          s.pollutant === pollutant &&
+          (!config.referenceOnly || s.quality === "reference"),
+      )
+      .map((s) => {
+        const distance = distanceKm(point, s),
+          age = Math.max(0, (now - Date.parse(s.ts)) / 3600000);
+        const quality =
+          s.quality === "reference"
+            ? 1
+            : s.averagingMinutes === 60
+              ? 0.45
+              : 0.2;
+        const weight =
+          Math.exp(-distance / config.lengthScaleKm) *
+          Math.exp(-age / 1.5) *
+          quality;
+        return { ...s, distance, weight };
+      })
+      .filter((s) => Number.isFinite(s.distance) && s.distance <= radiusKm)
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 16);
+    if (!candidates.length) {
+      corrections[pollutant] = 0;
+      continue;
+    }
+    const residuals = candidates.map((s) => s.value_ugm3 - s.model_ugm3!);
+    const center = median(residuals),
+      mad = median(residuals.map((r) => Math.abs(r - center)));
+    const floor =
+      pollutant === "pm2_5" ? 5 : pollutant === "carbon_monoxide" ? 100 : 10;
+    const bound =
+      config.strategy === "weighted"
+        ? Infinity
+        : Math.max(floor, 3 * 1.4826 * mad);
+    const weight = candidates.reduce((sum, s) => sum + s.weight, 0);
+    const correction =
+      (config.gain *
+        candidates.reduce(
+          (sum, s, i) =>
+            sum +
+            s.weight *
+              Math.max(center - bound, Math.min(center + bound, residuals[i])),
+          0,
+        )) /
+      (config.prior + weight);
+    concentrations[pollutant] = Math.max(0, model[pollutant]! + correction);
+    corrections[pollutant] = concentrations[pollutant]! - model[pollutant]!;
+    stations.push(...candidates);
+  }
+  const count = new Set(stations.map((s) => s.id)).size;
+  return {
+    concentrations,
+    corrections,
+    stations: stations.sort((a, b) => a.distance - b.distance),
+    support: count >= 3 ? "local" : count ? "limited" : "model",
+    parameters: input.configs,
+  };
 }

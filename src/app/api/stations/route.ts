@@ -57,6 +57,9 @@ export async function GET(request: Request) {
               },
             ],
             validation: snapshot.validation,
+            history: snapshot.history,
+            calibration: snapshot.calibration,
+            streetObservations: snapshot.streetObservations,
           });
       }
       statuses.push({
@@ -98,9 +101,8 @@ export async function GET(request: Request) {
           next: { revalidate: 300 },
         } as RequestInit & { timeoutMs: number },
       );
-      const observations = clusterCitizens(
-        qualityControl(normalizeCitizen(data), now),
-      );
+      const clean = qualityControl(normalizeCitizen(data), now);
+      const observations = clusterCitizens(clean);
       statuses.push({
         source: "Sensor.Community",
         status: "ok",
@@ -113,6 +115,9 @@ export async function GET(request: Request) {
         generatedAt: new Date(now).toISOString(),
         statuses,
         validation: {},
+        streetObservations: clean.filter(
+          (s) => s.coordinateQuality === "declared-exact",
+        ),
       });
     } catch {
       statuses.push({

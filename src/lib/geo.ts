@@ -35,6 +35,6 @@ export function validPoint(lat: number, lon: number) {
 export function inBounds(p: Point, b: [number, number, number, number]) {
   return p.lon >= b[0] && p.lat >= b[1] && p.lon <= b[2] && p.lat <= b[3];
 }
-export function coordinates(p: Point) {
-  return `${Math.abs(p.lat).toFixed(4)}° ${p.lat < 0 ? "S" : "N"}, ${Math.abs(p.lon).toFixed(4)}° ${p.lon < 0 ? "W" : "E"}`;
+export function coordinates(p: Point, digits = 4) {
+  return `${Math.abs(p.lat).toFixed(digits)}° ${p.lat < 0 ? "S" : "N"}, ${Math.abs(p.lon).toFixed(digits)}° ${p.lon < 0 ? "W" : "E"}`;
 }

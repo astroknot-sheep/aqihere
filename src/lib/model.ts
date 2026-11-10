@@ -103,31 +103,117 @@ export async function fetchWeather(
 export async function attachModelBaselines(
   records: StationRecord[],
   signal?: AbortSignal,
+  cache?: BaselineCache,
 ): Promise<StationRecord[]> {
-  const missing = records.filter((s) => !finite(s.model_ugm3) || !s.modelTs);
+  const missing = records.filter(
+    (s) =>
+      !finite(s.model_ugm3) ||
+      !s.modelTs ||
+      s.modelAveragingMinutes !== s.averagingMinutes,
+  );
   const unique = [...new Map(missing.map((s) => [s.id, s])).values()].slice(
     0,
-    12,
+    96,
   );
   if (!unique.length) return records;
-  const response = await fetchJSON<RawAir | RawAir[]>(airURL(unique), {
-    signal,
-    timeoutMs: 6000,
-  });
-  const models = (Array.isArray(response) ? response : [response]).map(
-    normalizeAir,
-  );
-  const lookup = new Map(unique.map((s, i) => [s.id, models[i]]));
+  const lookup = new Map<string, ModelData>();
+  for (const s of unique) {
+    const entry = cache?.entries.find(
+      (e) =>
+        e.id === s.id &&
+        e.lat === s.lat &&
+        e.lon === s.lon &&
+        Date.now() - e.fetchedAt < 3600000 &&
+        e.model.hourly.some((h) => h.time >= Date.parse(s.ts) / 1000),
+    );
+    if (entry) lookup.set(s.id, entry.model);
+  }
+  const pending = unique.filter((s) => !lookup.has(s.id));
+  if (pending.length) {
+    const response = await fetchJSON<RawAir | RawAir[]>(airURL(pending), {
+      signal,
+      timeoutMs: 12000,
+    });
+    const models = (Array.isArray(response) ? response : [response]).map(
+      normalizeAir,
+    );
+    pending.forEach((s, i) => {
+      lookup.set(s.id, models[i]);
+      if (cache) {
+        cache.entries = cache.entries.filter((e) => e.id !== s.id);
+        cache.entries.push({
+          id: s.id,
+          lat: s.lat,
+          lon: s.lon,
+          fetchedAt: Date.now(),
+          model: models[i],
+        });
+      }
+    });
+  }
   return records.map((s) => {
-    if (finite(s.model_ugm3) && s.modelTs) return s;
+    if (
+      finite(s.model_ugm3) &&
+      s.modelTs &&
+      s.modelAveragingMinutes === s.averagingMinutes
+    )
+      return s;
     const model = lookup.get(s.id);
-    const at = Math.floor(Date.parse(s.ts) / 3_600_000) * 3600;
-    const hourly = model?.hourly.find((h) => h.time === at);
-    if (!hourly || !finite(hourly.values[s.pollutant])) return s;
+    if (!model || !s.averagingMinutes || s.averagingMinutes > 120) return s;
+    const value = matchingModelMean(
+      model.hourly,
+      Date.parse(s.ts) / 1000,
+      s.pollutant,
+      s.averagingMinutes,
+    );
+    if (!finite(value)) return s;
     return {
       ...s,
-      model_ugm3: hourly.values[s.pollutant],
-      modelTs: new Date(at * 1000).toISOString(),
+      model_ugm3: value,
+      modelTs: s.ts,
+      modelAveragingMinutes: s.averagingMinutes,
     };
   });
+}
+
+export type BaselineCache = {
+  version: 2;
+  entries: {
+    id: string;
+    lat: number;
+    lon: number;
+    fetchedAt: number;
+    model: ModelData;
+  }[];
+};
+/** Integrate the model's piecewise-linear field over the sensor's actual
+ * averaging window. A 1h mean must not be compared with an instantaneous grid. */
+export function matchingModelMean(
+  hourly: ModelData["hourly"],
+  end: number,
+  pollutant: (typeof POLLUTANTS)[number],
+  minutes: number,
+): number | undefined {
+  if (!Number.isFinite(end) || minutes <= 0) return undefined;
+  const start = end - minutes * 60,
+    series = hourly
+      .filter((h) => Number.isFinite(h.values[pollutant]))
+      .sort((a, b) => a.time - b.time);
+  let area = 0,
+    covered = 0;
+  for (let i = 1; i < series.length; i++) {
+    const a = series[i - 1],
+      b = series[i];
+    if (b.time - a.time !== 3600) continue;
+    const lo = Math.max(start, a.time),
+      hi = Math.min(end, b.time);
+    if (hi <= lo) continue;
+    const value = (t: number) =>
+      a.values[pollutant]! +
+      ((b.values[pollutant]! - a.values[pollutant]!) * (t - a.time)) /
+        (b.time - a.time);
+    area += ((value(lo) + value(hi)) / 2) * (hi - lo);
+    covered += hi - lo;
+  }
+  return Math.abs(covered - (end - start)) < 0.01 ? area / covered : undefined;
 }

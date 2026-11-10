@@ -28,6 +28,7 @@ const station = (overrides: Partial<StationRecord> = {}): StationRecord => ({
   value_ugm3: 30,
   model_ugm3: 10,
   modelTs: new Date(now).toISOString(),
+  modelAveragingMinutes: 60,
   ts: new Date(now).toISOString(),
   quality: "reference",
   averagingMinutes: 60,
@@ -44,11 +45,11 @@ test("EPA 2024 PM2.5 endpoints and truncation", () => {
     [125.4, 200],
     [225.4, 300],
     [325.4, 500],
-    [500, 500],
   ])
     assert.equal(subIndex("pm2_5", c, "us"), expected);
   assert.equal(subIndex("pm2_5", 9.09, "us"), 50);
   assert.equal(subIndex("pm2_5", NaN, "us"), null);
+  assert.ok(subIndex("pm2_5", 500, "us")! > 500);
 });
 test("India and revised EEA categories remain distinct", () => {
   assert.equal(subIndex("pm2_5", 30, "india"), 50);
@@ -79,10 +80,7 @@ test("averaging uses past data only and requires 75% coverage", () => {
     values: { pm2_5: i === 24 ? 999 : 12, ozone: 48 },
   }));
   assert.equal(averagedConcentrations(hours, at, "us").pm2_5, 12);
-  assert.equal(
-    averagedConcentrations(hours.slice(-8), at, "us").pm2_5,
-    undefined,
-  );
+  assert.equal(averagedConcentrations(hours.slice(-8), at, "us").pm2_5, 12);
   assert.equal(averagedConcentrations(hours, at, "us").ozone, 48);
 });
 test("residual correction shrinks to model and excludes invalid stations", () => {
@@ -91,6 +89,7 @@ test("residual correction shrinks to model and excludes invalid stations", () =>
     model: { pm2_5: 10 },
     observations: [station()],
     now,
+    configs: { pm2_5: { lengthScaleKm: 15, prior: 1, gain: 1 } },
   };
   assert.equal(estimate(input).concentrations.pm2_5, 20);
   assert.equal(
@@ -128,7 +127,7 @@ test("residual correction shrinks to model and excludes invalid stations", () =>
     0,
   );
 });
-test("wind direction means FROM; calm air has no direction bias", () => {
+test("unvalidated wind directions do not change concentration estimates", () => {
   const north = station({ id: "north", lat: 0.05 }),
     south = station({ id: "south", lat: -0.05, value_ugm3: 0 });
   const input = {
@@ -138,9 +137,9 @@ test("wind direction means FROM; calm air has no direction bias", () => {
     now,
   };
   const upwind = estimate({ ...input, wind: { speed: 3, direction: 0 } });
-  assert.ok(
-    upwind.stations.find((s) => s.id === "north")!.weight >
-      upwind.stations.find((s) => s.id === "south")!.weight,
+  assert.equal(
+    upwind.stations.find((s) => s.id === "north")!.weight,
+    upwind.stations.find((s) => s.id === "south")!.weight,
   );
   const calm = estimate({ ...input, wind: { speed: 0, direction: 0 } });
   assert.equal(calm.stations[0].weight, calm.stations[1].weight);

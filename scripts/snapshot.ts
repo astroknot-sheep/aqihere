@@ -8,9 +8,11 @@ import {
 } from "../src/lib/adapters";
 import { clusterCitizens, qualityControl } from "../src/lib/estimate";
 import { fetchJSON } from "../src/lib/fetch";
-import { inBounds } from "../src/lib/geo";
-import { attachModelBaselines } from "../src/lib/model";
-import { validateSnapshot } from "../src/lib/validation";
+import { distanceKm, inBounds } from "../src/lib/geo";
+import { attachModelBaselines, type BaselineCache } from "../src/lib/model";
+import { calibrateWithHistory } from "../src/lib/calibration";
+import { mergeHistory } from "../src/lib/history";
+import { fetchBerlinHistory } from "./berlin";
 import type {
   SourceStatus,
   StationRecord,
@@ -35,8 +37,47 @@ async function main() {
       "SNAPSHOT_BBOX must be west,south,east,north within map bounds",
     );
   const statuses: SourceStatus[] = [];
-  const userAgent = "AQIHere/1.0 (https://github.com/astroknot-sheep/aqihere)";
+  const userAgent = "AQIHere/1.1 (https://github.com/astroknot-sheep/aqihere)";
   const now = Date.now();
+  const baseURL =
+    process.env.SNAPSHOT_PREVIOUS_BASE_URL ??
+    "https://raw.githubusercontent.com/astroknot-sheep/aqihere/snapshots/data";
+  const previousPromise = fetchJSON<StationSnapshot>(
+    `${baseURL}/stations.json`,
+    { timeoutMs: 8000 },
+  ).catch(() => null);
+  const cachePromise = fetchJSON<BaselineCache>(
+    `${baseURL}/baseline-cache.json`,
+    { timeoutMs: 8000 },
+  ).catch(() => ({ version: 2 as const, entries: [] }));
+  const berlinPromise = (async () => {
+    if (
+      bounds[0] > 13.8 ||
+      bounds[1] > 52.7 ||
+      bounds[2] < 13.05 ||
+      bounds[3] < 52.3
+    )
+      return [];
+    const started = Date.now();
+    try {
+      const data = await fetchBerlinHistory(bounds, now);
+      statuses.push({
+        source: "Berlin BLUME",
+        status: data.length ? "ok" : "unavailable",
+        latencyMs: Date.now() - started,
+        detail: `${data.length} completed hourly reference readings`,
+      });
+      return data;
+    } catch {
+      statuses.push({
+        source: "Berlin BLUME",
+        status: "unavailable",
+        latencyMs: Date.now() - started,
+        detail: "Reference feed unavailable",
+      });
+      return [];
+    }
+  })();
   const sources = await Promise.allSettled([
     (async (): Promise<StationRecord[]> => {
       const start = Date.now();
@@ -99,7 +140,9 @@ async function main() {
             (l) =>
               !l.isMobile &&
               l.sensors.some((s) =>
-                ["pm25", "pm10", "no2", "o3"].includes(s.parameter.name),
+                ["pm25", "pm10", "no2", "o3", "so2", "co"].includes(
+                  s.parameter.name,
+                ),
               ),
           )
           .slice(0, 12);
@@ -138,29 +181,69 @@ async function main() {
       }
     })(),
   ]);
-  let records = clusterCitizens(
-    qualityControl(
-      sources.flatMap((r) => (r.status === "fulfilled" ? r.value : [])),
-      now,
-    ),
+  const berlin = await berlinPromise;
+  const clean = qualityControl(
+    [
+      ...sources.flatMap((r) => (r.status === "fulfilled" ? r.value : [])),
+      ...berlin,
+    ],
+    now,
   );
+  const streetObservations = clean.filter(
+    (s) =>
+      s.coordinateQuality === "official" ||
+      s.coordinateQuality === "declared-exact",
+  );
+  let records = clusterCitizens(clean);
   // Preserve references first, then cap citizens for a compact regional file.
+  const center = {
+    lat: (bounds[1] + bounds[3]) / 2,
+    lon: (bounds[0] + bounds[2]) / 2,
+  };
   records.sort(
     (a, b) =>
-      (a.quality === "reference" ? 0 : 1) - (b.quality === "reference" ? 0 : 1),
+      (a.quality === "reference" ? 0 : 1) -
+        (b.quality === "reference" ? 0 : 1) ||
+      distanceKm(a, center) - distanceKm(b, center),
   );
-  const ids = [...new Set(records.map((r) => r.id))].slice(0, 32);
+  const ids = [...new Set(records.map((r) => r.id))].slice(0, 96);
   records = records.filter((r) => ids.includes(r.id));
   const annotated: StationRecord[] = [];
+  const [previous, baselineCache] = await Promise.all([
+    previousPromise,
+    cachePromise,
+  ]);
+  if (baselineCache.version !== 2) {
+    baselineCache.version = 2;
+    baselineCache.entries = [];
+  }
   for (let i = 0; i < ids.length; i += 12) {
     const batch = records.filter((r) => ids.slice(i, i + 12).includes(r.id));
     try {
-      annotated.push(...(await attachModelBaselines(batch)));
+      annotated.push(
+        ...(await attachModelBaselines(batch, undefined, baselineCache)),
+      );
     } catch {
       annotated.push(...batch);
     }
   }
-  const validation = validateSnapshot(annotated);
+  let berlinAnnotated = berlin;
+  try {
+    berlinAnnotated = await attachModelBaselines(
+      berlin,
+      undefined,
+      baselineCache,
+    );
+  } catch {
+    /* Measured station history is still usable. */
+  }
+  const history = mergeHistory(
+    previous?.history?.filter((s) => inBounds(s, bounds)) ?? [],
+    [...berlinAnnotated, ...annotated],
+    now,
+  );
+  const calibration = calibrateWithHistory(annotated, history, now);
+  const validation = calibration.validation;
   const snapshot: StationSnapshot = {
     version: 1,
     generatedAt: new Date(now).toISOString(),
@@ -169,6 +252,9 @@ async function main() {
     observations: annotated,
     validation,
     statuses,
+    history,
+    calibration,
+    streetObservations,
   };
   const directory = path.resolve(
     process.env.SNAPSHOT_OUTPUT_DIR ?? "work/snapshots",
@@ -178,15 +264,25 @@ async function main() {
     path.join(directory, "stations.json"),
     JSON.stringify(snapshot),
   );
+  baselineCache.entries = baselineCache.entries
+    .filter((e) => now - e.fetchedAt < 2 * 3600000)
+    .slice(-120);
+  await writeFile(
+    path.join(directory, "baseline-cache.json"),
+    JSON.stringify(baselineCache),
+  );
   await writeFile(
     path.join(directory, "validation.json"),
     JSON.stringify(
       {
         generatedAt: snapshot.generatedAt,
         region: snapshot.region,
-        method:
-          "Leave-one-station-out; all monitors within 1 km excluded; no tuned hyperparameters",
+        method: calibration.method,
         metrics: validation,
+        configs: calibration.configs,
+        historyHours: new Set(
+          history.map((s) => Math.floor(Date.parse(s.ts) / 3600000)),
+        ).size,
       },
       null,
       2,
