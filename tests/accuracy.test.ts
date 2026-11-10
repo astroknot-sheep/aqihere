@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { aqi, averagedConcentrations, nowCast, subIndex } from "../src/lib/aqi";
+import {
+  aqi,
+  averagedConcentrations,
+  currentModelIndex,
+  nowCast,
+  subIndex,
+} from "../src/lib/aqi";
 import { matchingModelMean } from "../src/lib/model";
 import { mergeHistory } from "../src/lib/history";
 import { calibrate } from "../src/lib/calibration";
@@ -139,6 +145,35 @@ test("the current US index uses the correct clock-hour slots and ignores future 
     { time: at + 3600, values: { pm2_5: 999 } },
   ];
   assert.equal(averagedConcentrations(hourly, at, "us").pm2_5, 12);
+});
+
+test("current AQI uses the hourly grid in fractional-offset time zones", () => {
+  const currentTime = Date.parse("2026-11-10T13:00:00Z") / 1000;
+  const indexTime = currentTime - 1800;
+  const hours = Array.from({ length: 24 }, (_, i) => ({
+    time: indexTime - (23 - i) * 3600,
+    values: { pm2_5: 88.7, nitrogen_dioxide: 79.1 },
+  }));
+  const future = { time: indexTime + 3600, values: { pm2_5: 999 } };
+  for (const standard of ["us", "india", "eu"] as const) {
+    const result = currentModelIndex([...hours, future], currentTime, standard);
+    assert.equal(result.indexTime, indexTime);
+    assert.ok(Math.abs(result.average.pm2_5! - 88.7) < 1e-9);
+    assert.equal(result.index.dominant, "pm2_5");
+  }
+  const gap = currentModelIndex(
+    [...hours.slice(0, -1), future],
+    currentTime,
+    "us",
+  );
+  assert.equal(gap.indexTime, indexTime);
+  assert.equal(gap.average.nitrogen_dioxide, undefined);
+  assert.ok(Math.abs(gap.average.pm2_5! - 88.7) < 1e-9);
+  assert.equal(
+    currentModelIndex([future], currentTime, "us").index.value,
+    null,
+  );
+  assert.equal(currentModelIndex(hours, indexTime, "us").indexTime, indexTime);
 });
 
 test("street searches enforce the selected radius, source position and GPS uncertainty", () => {

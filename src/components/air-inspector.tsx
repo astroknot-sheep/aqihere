@@ -156,7 +156,7 @@ export function CurrentPanel({
           <Clock3 size={14} />
           <span>
             {air.model
-              ? localTime(air.modelTime, zone, true)
+              ? localTime(air.indexTime, zone, true)
               : "Awaiting model data"}
           </span>
         </div>
@@ -205,6 +205,9 @@ export function CurrentPanel({
           </tbody>
         </table>
         <p className="small-copy">
+          {air.model && air.indexTime !== air.modelTime && (
+            <>Current concentrations at {localTime(air.modelTime, zone)}. </>
+          )}
           Index inputs use the averaging period for the selected standard.
         </p>
       </section>

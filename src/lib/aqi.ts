@@ -280,6 +280,27 @@ export function averagedConcentrations(
   return out;
 }
 
+export function currentModelIndex(
+  hourly: ModelData["hourly"],
+  currentTime: number,
+  standard: Standard,
+) {
+  // Open-Meteo current and hourly data can use different minute offsets.
+  // Keep the hourly grid's phase so a missing hour stays missing.
+  const gridStart = hourly[0]?.time ?? currentTime;
+  const indexTime =
+    gridStart + Math.floor((currentTime - gridStart) / 3600) * 3600;
+  const average = averagedConcentrations(hourly, indexTime, standard);
+  const ozone = hourly.find((h) => h.time === indexTime)?.values.ozone;
+  const index = aqi(
+    average,
+    standard,
+    ozone,
+    periodMean(hourly, indexTime, "sulphur_dioxide", 24),
+  );
+  return { indexTime, average, index };
+}
+
 export const SCALE = {
   us: {
     label: "US AQI",

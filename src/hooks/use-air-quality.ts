@@ -1,6 +1,11 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { averagedConcentrations, aqi, periodMean } from "@/lib/aqi";
+import {
+  averagedConcentrations,
+  aqi,
+  currentModelIndex,
+  periodMean,
+} from "@/lib/aqi";
 import { calibrate } from "@/lib/calibration";
 import { clusterCitizens, estimate, qualityControl } from "@/lib/estimate";
 import { fetchJSON } from "@/lib/fetch";
@@ -168,12 +173,10 @@ export function useAirQuality(
         correctedHistoryHours++;
       return { ...h, values: corrected.concentrations };
     });
-    const average = averagedConcentrations(hours, modelTime, standard);
-    const index = aqi(
-      average,
+    const { indexTime, average, index } = currentModelIndex(
+      hours,
+      modelTime,
       standard,
-      result.concentrations.ozone,
-      periodMean(hours, modelTime, "sulphur_dioxide", 24),
     );
     const forecast = (data.model?.hourly ?? [])
       .filter((h) => h.time >= modelTime && h.time <= modelTime + 24 * 3600)
@@ -193,6 +196,7 @@ export function useAirQuality(
       forecast,
       observations,
       modelTime,
+      indexTime,
       correctedHistoryHours,
     };
   }, [data, point, radius, standard]);

@@ -237,6 +237,7 @@ export default function Explorer() {
         "index_period_ugm3",
         "station_count",
         "tier",
+        "index_time_utc",
       ],
       ...POLLUTANTS.map((p) => [
         point.lat,
@@ -249,6 +250,9 @@ export default function Explorer() {
         air.average[p] ?? "",
         new Set(air.result.stations.map((s) => s.id)).size,
         air.stationData?.tier ?? "model",
+        air.index.value === null
+          ? ""
+          : new Date(air.indexTime * 1000).toISOString(),
       ]),
     ];
     const csv = rows
