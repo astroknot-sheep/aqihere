@@ -33,10 +33,12 @@ function mapPoint(latlng: L.LatLng): Point {
     lon: ((((latlng.lng + 180) % 360) + 360) % 360) - 180,
   };
 }
+const MAX_MAP_ZOOM = 19;
+
 function fitStreet(map: L.Map, point: Point, radius: number) {
   map.fitBounds(L.latLng(point.lat, point.lon).toBounds(radius * 2), {
     padding: [48, 48],
-    maxZoom: 19,
+    maxZoom: MAX_MAP_ZOOM,
     animate: false,
   });
 }
@@ -130,12 +132,13 @@ export default function AirMap({
       center={[point.lat, point.lon]}
       zoom={11}
       minZoom={3}
-      maxZoom={19}
+      maxZoom={MAX_MAP_ZOOM}
       zoomControl={false}
       className={`air-map ${terrain ? "map-detailed" : "map-muted"}`}
       worldCopyJump
     >
       <TileLayer
+        maxZoom={MAX_MAP_ZOOM}
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       />
