@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type CSSProperties } from "react";
 import {
   Area,
   AreaChart,
@@ -106,25 +106,25 @@ export function CurrentPanel({
   const zone = air.model?.timezone ?? "UTC";
   const wind = air.weather;
   const modelDescription = contributors
-    ? `${contributors} monitors informed the regional estimate`
-    : "CAMS regional model";
+    ? `Estimate · ${contributors} contributing monitors`
+    : "Estimate · CAMS model";
   const aggregation =
     standard === "us"
       ? "PM NowCast · rolling gas windows"
       : standard === "india"
         ? "24 h particles and gases · 8 h ozone and CO"
         : "Hourly concentrations · EEA bands";
+  const scale = SCALE[standard];
+  const position = ((state.index + 0.5) / scale.names.length) * 100;
   return (
     <>
       <section
         className="index-panel"
         aria-busy={air.loading}
         aria-live="polite"
-        style={{ borderLeftColor: state.color }}
+        style={{ "--reading-color": state.color } as CSSProperties}
       >
-        <span className="eyebrow">
-          Current {SCALE[standard].label} estimate
-        </span>
+        <span className="eyebrow">{scale.label} · Current</span>
         <div className="index-line">
           <strong className="index-number">
             {air.loading
@@ -141,6 +141,16 @@ export function CurrentPanel({
               </span>
             )}
           </div>
+        </div>
+        <div className="index-spectrum" aria-hidden="true">
+          {COLORS.map((color) => (
+            <span key={color} style={{ background: color }} />
+          ))}
+          {air.index.value !== null && <i style={{ left: `${position}%` }} />}
+        </div>
+        <div className="spectrum-endpoints" aria-hidden="true">
+          <span>{scale.names[0]}</span>
+          <span>{scale.names[scale.names.length - 1]}</span>
         </div>
         <div className="index-meta">
           <Clock3 size={14} />
@@ -492,9 +502,11 @@ export function StreetPanel({
 export function ForecastPanel({
   air,
   standard,
+  compact = false,
 }: {
   air: Air;
   standard: Standard;
+  compact?: boolean;
 }) {
   const zone = air.model?.timezone ?? "UTC";
   const available = air.forecast.filter((h) => h.value !== null);
@@ -503,11 +515,11 @@ export function ForecastPanel({
     undefined,
   );
   return (
-    <section className="inspector-section">
-      <h2>Next 24 hours</h2>
-      <p className="small-copy">
-        CAMS forecast · {SCALE[standard].label} · local time
-      </p>
+    <section className={compact ? "forecast-dock" : "inspector-section"}>
+      <div className="forecast-heading">
+        <h2>Next 24 hours</h2>
+        <p className="small-copy">CAMS forecast · {SCALE[standard].label}</p>
+      </div>
       {available.length ? (
         <>
           <div className="forecast-chart">
@@ -518,7 +530,7 @@ export function ForecastPanel({
               >
                 <CartesianGrid
                   vertical={false}
-                  stroke="#d8dee7"
+                  stroke="#dce2d7"
                   strokeDasharray="3 4"
                 />
                 <XAxis
@@ -533,14 +545,14 @@ export function ForecastPanel({
                   ticks={air.forecast
                     .filter((_, i) => i % 6 === 0)
                     .map((h) => h.time)}
-                  tick={{ fontSize: 11, fill: "#475569" }}
+                  tick={{ fontSize: 11, fill: "#536354" }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
                   domain={standard === "eu" ? [1, 6] : [0, "auto"]}
                   tickCount={4}
-                  tick={{ fontSize: 11, fill: "#475569" }}
+                  tick={{ fontSize: 11, fill: "#536354" }}
                   axisLine={false}
                   tickLine={false}
                 />
@@ -554,15 +566,15 @@ export function ForecastPanel({
                 <Area
                   dataKey="value"
                   type="linear"
-                  stroke="#1d4ed8"
-                  fill="#dbeafe"
+                  stroke="#49684e"
+                  fill="#e4eddf"
                   strokeWidth={2}
                   isAnimationActive={false}
                 />
               </AreaChart>
             </ResponsiveContainer>
           </div>
-          {high && (
+          {!compact && high && (
             <p className="forecast-peak">
               Peak{" "}
               {standard === "india" && high.value === 401 ? "400+" : high.value}{" "}
@@ -570,29 +582,31 @@ export function ForecastPanel({
               {localTime(high.time, zone, true)}
             </p>
           )}
-          <table className="data-table">
-            <caption className="sr-only">
-              Forecast at six-hour intervals
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col">Local time</th>
-                <th scope="col">{SCALE[standard].label}</th>
-                <th scope="col">Category</th>
-              </tr>
-            </thead>
-            <tbody>
-              {air.forecast
-                .filter((_, i) => i % 6 === 0)
-                .map((h) => (
-                  <tr key={h.time}>
-                    <th scope="row">{localTime(h.time, zone)}</th>
-                    <td>{h.aboveRange ? "400+" : (h.value ?? "—")}</td>
-                    <td>{category(h.value, standard).label}</td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
+          {!compact && (
+            <table className="data-table">
+              <caption className="sr-only">
+                Forecast at six-hour intervals
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Local time</th>
+                  <th scope="col">{SCALE[standard].label}</th>
+                  <th scope="col">Category</th>
+                </tr>
+              </thead>
+              <tbody>
+                {air.forecast
+                  .filter((_, i) => i % 6 === 0)
+                  .map((h) => (
+                    <tr key={h.time}>
+                      <th scope="row">{localTime(h.time, zone)}</th>
+                      <td>{h.aboveRange ? "400+" : (h.value ?? "—")}</td>
+                      <td>{category(h.value, standard).label}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          )}
         </>
       ) : (
         <p className="empty-state">

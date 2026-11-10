@@ -52,7 +52,7 @@ const AirMap = dynamic(() => import("./air-map"), {
 });
 const REPO = "https://github.com/astroknot-sheep/aqihere";
 const TABS = [
-  { id: "current", label: "Current" },
+  { id: "current", label: "Overview" },
   { id: "stations", label: "Stations" },
   { id: "street", label: "Street" },
   { id: "forecast", label: "Forecast" },
@@ -142,6 +142,8 @@ export default function Explorer() {
     if (street === 10 || street === 25 || street === 50 || street === 100) {
       setStreetRadius(street);
       setPanel("street");
+      if (window.matchMedia("(max-width: 760px)").matches)
+        setMobileDetails(true);
     }
     setUrlLoaded(true);
   }, []);
@@ -269,9 +271,12 @@ export default function Explorer() {
     <div className="app-shell">
       <header className="site-header">
         <a className="brand" href="/" aria-label="AQIHere home">
-          <MapPin size={23} />
-          <strong>AQIHere</strong>
-          <span className="brand-context">Air quality map</span>
+          <span className="brand-mark" aria-hidden="true">
+            <MapPin size={20} strokeWidth={1.7} />
+          </span>
+          <strong>
+            aqihere<span>.earth</span>
+          </strong>
         </a>
         <nav aria-label="Map and data controls">
           <label className="standard-select">
@@ -313,7 +318,7 @@ export default function Explorer() {
         >
           <div className="inspector-heading">
             <div className="section-heading">
-              <span className="eyebrow">Selected location</span>
+              <span className="eyebrow">Air quality explorer</span>
               <button
                 className="outline-button mobile-back"
                 onClick={() => setMobileDetails(false)}
@@ -423,12 +428,12 @@ export default function Explorer() {
               disabled={!air.model}
             >
               <ArrowDownToLine size={15} />
-              CSV
+              Estimate CSV
             </button>
           </footer>
         </aside>
         <section
-          className="map-section"
+          className={`map-section${panel === "current" ? " with-forecast" : ""}`}
           aria-label="Air quality map"
           inert={isMobile && mobileDetails}
         >
@@ -493,8 +498,7 @@ export default function Explorer() {
           <div className="map-scale-note">
             {panel === "street"
               ? `${streetRadius} m inspection radius`
-              : `${radius} km monitor search`}
-            <span> · Click the map to move the pin</span>
+              : `${radius} km monitor radius`}
           </div>
           <div className="map-zoom" aria-label="Map navigation">
             <button
@@ -540,6 +544,11 @@ export default function Explorer() {
               <ScaleLegend standard={standard} />
             </div>
           </details>
+          {!isMobile && panel === "current" && (
+            <div className="map-forecast">
+              <ForecastPanel air={air} standard={standard} compact />
+            </div>
+          )}
           <div className="mobile-summary">
             <button
               className="mobile-current"

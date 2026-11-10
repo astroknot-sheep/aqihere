@@ -154,7 +154,7 @@ export default function AirMap({
         radius={streetRadius ?? radius * 1000}
         interactive={false}
         pathOptions={{
-          color: "#1d4ed8",
+          color: "#466a4f",
           weight: streetRadius ? 2 : 1,
           dashArray: streetRadius ? undefined : "5 5",
           fillOpacity: streetRadius ? 0.08 : 0.025,
