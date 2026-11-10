@@ -1,0 +1,21 @@
+{
+  "generatedAt": "2026-11-10T11:22:52.253Z",
+  "region": "Berlin region",
+  "method": "Leave-one-station-out; all monitors within 1 km excluded; no tuned hyperparameters",
+  "metrics": {
+    "pm2_5": {
+      "count": 32,
+      "rmse": 8.831415246752018,
+      "mae": 6.158300502444135,
+      "bias": 2.4818309246918937,
+      "modelRmse": 16.365282230991312
+    },
+    "pm10": {
+      "count": 32,
+      "rmse": 13.893196574881054,
+      "mae": 10.015404149882555,
+      "bias": -1.508440966791478,
+      "modelRmse": 13.634880591703032
+    }
+  }
+}
