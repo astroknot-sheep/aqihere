@@ -1,0 +1,47 @@
+name: Refresh regional station snapshot
+on:
+  schedule:
+    - cron: "7,17,27,37,47,57 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: regional-station-snapshot
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Collect, clean, annotate and validate
+        run: npm run snapshot
+        env:
+          OPENAQ_API_KEY: ${{ secrets.OPENAQ_API_KEY }}
+          SNAPSHOT_BBOX: ${{ vars.SNAPSHOT_BBOX || '12.9,52.25,13.9,52.8' }}
+          SNAPSHOT_REGION: ${{ vars.SNAPSHOT_REGION || 'Berlin region' }}
+          SNAPSHOT_OUTPUT_DIR: ${{ runner.temp }}/aqihere-snapshot
+      - name: Publish compact JSON to data branch
+        env:
+          SNAPSHOT_DIR: ${{ runner.temp }}/aqihere-snapshot
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git fetch origin snapshots; then
+            git switch --force-create snapshots origin/snapshots
+          else
+            git switch --orphan snapshots
+            git rm -rf --ignore-unmatch .
+          fi
+          mkdir -p data
+          cp "$SNAPSHOT_DIR/stations.json" data/stations.json
+          cp "$SNAPSHOT_DIR/validation.json" data/validation.json
+          git add data
+          if git diff --staged --quiet; then exit 0; fi
+          git commit -m 'Refresh regional station snapshot'
+          git push origin HEAD:snapshots
