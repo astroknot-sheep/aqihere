@@ -1,85 +1,82 @@
 {
-  "generatedAt": "2026-11-13T22:52:53.730Z",
+  "generatedAt": "2026-11-14T02:44:41.842Z",
   "region": "Berlin region",
   "method": "Reference history uses separate chronological periods for fitting, choosing between correction methods and evaluating the result. Each target monitor and neighbours within 1 km are withheld. Sparse histories use nested spatial folds.",
   "metrics": {
     "pm2_5": {
-      "count": 72,
-      "rmse": 1.762980569816653,
-      "mae": 1.6008278225849588,
-      "bias": 0.001600649158675946,
-      "modelRmse": 2.2170034205356264,
-      "modelMae": 1.717361111111111,
-      "legacyRmse": 1.7629805698166532,
+      "count": 60,
+      "rmse": 1.5479079565311493,
+      "mae": 1.3047383938670771,
+      "bias": 0.25480782563461496,
+      "modelRmse": 1.5945088062890511,
+      "modelMae": 1.2741666666666667,
+      "legacyRmse": 1.6154153071460375,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 12,
-      "holdoutHours": 6
+      "holdoutHours": 5
     },
     "pm10": {
-      "count": 72,
-      "rmse": 2.950210196457494,
-      "mae": 2.5983218137025337,
-      "bias": 0.20878401483674694,
-      "modelRmse": 2.9628545263722352,
-      "modelMae": 2.4312500000000004,
-      "legacyRmse": 2.9502101964574945,
+      "count": 60,
+      "rmse": 2.2269934889891347,
+      "mae": 1.913333333333334,
+      "bias": 0.9400000000000001,
+      "modelRmse": 2.2269934889891347,
+      "modelMae": 1.913333333333334,
+      "legacyRmse": 2.1936626113108,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 12,
-      "holdoutHours": 6
+      "holdoutHours": 5
     },
     "nitrogen_dioxide": {
-      "count": 90,
-      "rmse": 7.012580805341486,
-      "mae": 5.5868447467237035,
-      "bias": -0.2438367427833682,
-      "modelRmse": 7.7540992742907,
-      "modelMae": 5.660000000000001,
-      "legacyRmse": 7.3533904622005535,
+      "count": 75,
+      "rmse": 5.728996421712968,
+      "mae": 4.34,
+      "bias": -2.866666666666667,
+      "modelRmse": 5.728996421712968,
+      "modelMae": 4.34,
+      "legacyRmse": 5.253171823671973,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 15,
-      "holdoutHours": 6
+      "holdoutHours": 5
     },
     "ozone": {
-      "count": 48,
-      "rmse": 6.343467768762866,
-      "mae": 4.9375,
-      "bias": 0.20833333333333334,
-      "modelRmse": 6.343467768762866,
-      "modelMae": 4.9375,
-      "legacyRmse": 6.60887654945989,
+      "count": 40,
+      "rmse": 5.295634994974635,
+      "mae": 4.2625,
+      "bias": 2.6875,
+      "modelRmse": 5.295634994974635,
+      "modelMae": 4.2625,
+      "legacyRmse": 4.8095899709551695,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 8,
-      "holdoutHours": 6
+      "holdoutHours": 5
     },
     "carbon_monoxide": {
       "count": 3,
-      "rmse": 79.00105484527828,
-      "mae": 64,
-      "bias": -64,
-      "modelRmse": 79.00105484527828,
-      "modelMae": 64,
+      "rmse": 29.52541278288925,
+      "mae": 29.5,
+      "bias": -29.5,
+      "modelRmse": 29.52541278288925,
+      "modelMae": 29.5,
       "method": "Insufficient monitors for nested calibration; CAMS retained"
     }
   },
   "configs": {
     "pm2_5": {
-      "lengthScaleKm": 15,
-      "prior": 1,
+      "lengthScaleKm": 5,
+      "prior": 0.3,
       "gain": 1,
-      "referenceOnly": true,
-      "strategy": "weighted"
+      "referenceOnly": true
     },
     "pm10": {
       "lengthScaleKm": 15,
       "prior": 1,
-      "gain": 1,
-      "referenceOnly": true
+      "gain": 0
     },
     "nitrogen_dioxide": {
-      "lengthScaleKm": 5,
+      "lengthScaleKm": 15,
       "prior": 1,
-      "gain": 1,
-      "referenceOnly": true
+      "gain": 0
     },
     "ozone": {
       "lengthScaleKm": 15,
