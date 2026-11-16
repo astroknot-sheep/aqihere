@@ -1,79 +1,78 @@
 {
-  "generatedAt": "2026-11-16T09:47:19.497Z",
+  "generatedAt": "2026-11-16T19:53:51.896Z",
   "region": "Berlin region",
   "method": "Reference history uses separate chronological periods for fitting, choosing between correction methods and evaluating the result. Each target monitor and neighbours within 1 km are withheld. Sparse histories use nested spatial folds.",
   "metrics": {
     "pm2_5": {
       "count": 72,
-      "rmse": 2.35517856355051,
-      "mae": 1.9000907472901,
-      "bias": -1.449394049855442,
-      "modelRmse": 4.70842182807691,
-      "modelMae": 4.306944444444445,
-      "legacyRmse": 1.9916715746464682,
+      "rmse": 1.4125028704567661,
+      "mae": 1.2585721017244165,
+      "bias": 0.4398534993928047,
+      "modelRmse": 2.1101441498943463,
+      "modelMae": 1.7819444444444439,
+      "legacyRmse": 1.4210899064535345,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 12,
       "holdoutHours": 6
     },
     "pm10": {
       "count": 72,
-      "rmse": 2.6470272145701665,
-      "mae": 2.245834253479755,
-      "bias": -0.9327547624688235,
-      "modelRmse": 6.650362876481921,
-      "modelMae": 6.199305555555556,
-      "legacyRmse": 2.647027214570166,
+      "rmse": 1.6193130089051524,
+      "mae": 1.3153428443061632,
+      "bias": 0.09888679947935754,
+      "modelRmse": 2.233465481164989,
+      "modelMae": 1.772916666666667,
+      "legacyRmse": 1.6151667365244196,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 12,
       "holdoutHours": 6
     },
     "nitrogen_dioxide": {
       "count": 90,
-      "rmse": 6.443188367154502,
-      "mae": 4.501220487007241,
-      "bias": -1.8180937563035955,
-      "modelRmse": 12.24092861401182,
-      "modelMae": 9.56888888888889,
-      "legacyRmse": 7.575454576778714,
+      "rmse": 7.214843133243493,
+      "mae": 6.126211478756803,
+      "bias": 1.320329348893496,
+      "modelRmse": 7.610887669064043,
+      "modelMae": 6.227777777777776,
+      "legacyRmse": 7.2685530411252754,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 15,
       "holdoutHours": 6
     },
     "ozone": {
       "count": 48,
-      "rmse": 5.954283881786642,
-      "mae": 5.054162053360506,
-      "bias": 0.2063052264572501,
-      "modelRmse": 14.638704405331323,
-      "modelMae": 13.5625,
-      "legacyRmse": 6.3060582694289256,
+      "rmse": 7.008336617967896,
+      "mae": 5.9634082416061505,
+      "bias": -2.4449286581539833,
+      "modelRmse": 15.745369689742652,
+      "modelMae": 13.895833333333334,
+      "legacyRmse": 8.390220054920993,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 8,
       "holdoutHours": 6
     },
     "carbon_monoxide": {
       "count": 3,
-      "rmse": 71.06686991840853,
-      "mae": 57,
-      "bias": -57,
-      "modelRmse": 71.06686991840853,
-      "modelMae": 57,
+      "rmse": 44.489699182320095,
+      "mae": 33.333333333333336,
+      "bias": -16.666666666666668,
+      "modelRmse": 44.489699182320095,
+      "modelMae": 33.333333333333336,
       "method": "Insufficient monitors for nested calibration; CAMS retained"
     }
   },
   "configs": {
     "pm2_5": {
       "lengthScaleKm": 5,
-      "prior": 1,
+      "prior": 0.3,
       "gain": 1,
       "referenceOnly": true
     },
     "pm10": {
       "lengthScaleKm": 15,
-      "prior": 1,
+      "prior": 0.3,
       "gain": 1,
-      "referenceOnly": true,
-      "strategy": "weighted"
+      "referenceOnly": true
     },
     "nitrogen_dioxide": {
       "lengthScaleKm": 5,
@@ -82,7 +81,7 @@
       "referenceOnly": true
     },
     "ozone": {
-      "lengthScaleKm": 30,
+      "lengthScaleKm": 15,
       "prior": 0.3,
       "gain": 1,
       "referenceOnly": true
@@ -98,5 +97,5 @@
       "gain": 0
     }
   },
-  "historyHours": 26
+  "historyHours": 27
 }
