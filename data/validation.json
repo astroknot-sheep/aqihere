@@ -1,63 +1,63 @@
 {
-  "generatedAt": "2026-11-15T22:23:52.102Z",
+  "generatedAt": "2026-11-16T02:15:19.102Z",
   "region": "Berlin region",
   "method": "Reference history uses separate chronological periods for fitting, choosing between correction methods and evaluating the result. Each target monitor and neighbours within 1 km are withheld. Sparse histories use nested spatial folds.",
   "metrics": {
     "pm2_5": {
-      "count": 72,
-      "rmse": 1.9037737296642034,
-      "mae": 1.6608274561346217,
-      "bias": 0.08684482871367614,
-      "modelRmse": 3.294908740938223,
-      "modelMae": 2.6423611111111116,
-      "legacyRmse": 2.1556568904584035,
+      "count": 60,
+      "rmse": 1.6029837187321856,
+      "mae": 1.3444045716325013,
+      "bias": 0.22889939295756123,
+      "modelRmse": 1.7150315837713699,
+      "modelMae": 1.3799999999999997,
+      "legacyRmse": 1.6906694018325161,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 12,
-      "holdoutHours": 6
+      "holdoutHours": 5
     },
     "pm10": {
-      "count": 72,
-      "rmse": 2.8919960492179704,
-      "mae": 2.5901412314971326,
-      "bias": -0.33986761673180454,
-      "modelRmse": 4.772428772531749,
-      "modelMae": 3.9423611111111114,
-      "legacyRmse": 2.8919960492179704,
+      "count": 60,
+      "rmse": 2.3825630092720487,
+      "mae": 1.9537746711659547,
+      "bias": -0.14414251320865126,
+      "modelRmse": 2.939905043818026,
+      "modelMae": 2.200833333333333,
+      "legacyRmse": 2.3825630092720487,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 12,
-      "holdoutHours": 6
+      "holdoutHours": 5
     },
     "nitrogen_dioxide": {
-      "count": 90,
-      "rmse": 6.092481705621555,
-      "mae": 4.321111111111112,
-      "bias": -2.1422222222222214,
-      "modelRmse": 6.092481705621555,
-      "modelMae": 4.321111111111112,
-      "legacyRmse": 5.9360411228261425,
+      "count": 75,
+      "rmse": 3.6002226990349024,
+      "mae": 2.6648679874867507,
+      "bias": 0.011601188497916368,
+      "modelRmse": 4.18332005309977,
+      "modelMae": 2.838000000000001,
+      "legacyRmse": 4.022534081987323,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 15,
-      "holdoutHours": 6
+      "holdoutHours": 5
     },
     "ozone": {
-      "count": 48,
-      "rmse": 4.347903910006666,
-      "mae": 3.387465440660493,
-      "bias": -0.6725407720099098,
-      "modelRmse": 4.7075958124432615,
-      "modelMae": 3.4270833333333335,
-      "legacyRmse": 4.428277577076116,
+      "count": 40,
+      "rmse": 4.397442438509002,
+      "mae": 3.175,
+      "bias": 0.8,
+      "modelRmse": 4.397442438509002,
+      "modelMae": 3.175,
+      "legacyRmse": 4.178562767107247,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 8,
-      "holdoutHours": 6
+      "holdoutHours": 5
     },
     "carbon_monoxide": {
       "count": 3,
-      "rmse": 99.71041403317241,
-      "mae": 99.66666666666667,
-      "bias": -99.66666666666667,
-      "modelRmse": 99.71041403317241,
-      "modelMae": 99.66666666666667,
+      "rmse": 8.2915619758885,
+      "mae": 8.166666666666666,
+      "bias": -8.166666666666666,
+      "modelRmse": 8.2915619758885,
+      "modelMae": 8.166666666666666,
       "method": "Insufficient monitors for nested calibration; CAMS retained"
     }
   },
@@ -75,15 +75,15 @@
       "referenceOnly": true
     },
     "nitrogen_dioxide": {
+      "lengthScaleKm": 5,
+      "prior": 1,
+      "gain": 1,
+      "referenceOnly": true
+    },
+    "ozone": {
       "lengthScaleKm": 15,
       "prior": 1,
       "gain": 0
-    },
-    "ozone": {
-      "lengthScaleKm": 30,
-      "prior": 0.3,
-      "gain": 1,
-      "referenceOnly": true
     },
     "sulphur_dioxide": {
       "lengthScaleKm": 15,
