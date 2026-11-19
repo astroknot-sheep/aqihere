@@ -1,83 +1,85 @@
 {
-  "generatedAt": "2026-11-19T07:40:25.345Z",
+  "generatedAt": "2026-11-19T16:48:04.695Z",
   "region": "Berlin region",
   "method": "Reference history uses separate chronological periods for fitting, choosing between correction methods and evaluating the result. Each target monitor and neighbours within 1 km are withheld. Sparse histories use nested spatial folds.",
   "metrics": {
     "pm2_5": {
-      "count": 72,
-      "rmse": 1.475356853042074,
-      "mae": 1.2429073909925978,
-      "bias": 0.32224786388767845,
-      "modelRmse": 1.5158537198555804,
-      "modelMae": 1.257638888888889,
-      "legacyRmse": 1.4750869294952882,
+      "count": 69,
+      "rmse": 2.3942916068269002,
+      "mae": 2.042994809789322,
+      "bias": 0.343794785975207,
+      "modelRmse": 2.2674444530850337,
+      "modelMae": 1.946376811594203,
+      "legacyRmse": 2.3942916068269002,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 12,
       "holdoutHours": 6
     },
     "pm10": {
-      "count": 72,
-      "rmse": 2.363906757351628,
-      "mae": 1.88120227497546,
-      "bias": 0.032263963512343695,
-      "modelRmse": 2.399985532363801,
-      "modelMae": 1.8472222222222223,
-      "legacyRmse": 2.3918502023823005,
+      "count": 69,
+      "rmse": 2.945279937975927,
+      "mae": 2.302173913043479,
+      "bias": -0.7543478260869565,
+      "modelRmse": 2.945279937975927,
+      "modelMae": 2.302173913043479,
+      "legacyRmse": 3.0175366121677905,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 12,
       "holdoutHours": 6
     },
     "nitrogen_dioxide": {
-      "count": 90,
-      "rmse": 10.969163849426062,
-      "mae": 6.753333333333331,
-      "bias": -5.043333333333333,
-      "modelRmse": 10.969163849426062,
-      "modelMae": 6.753333333333331,
-      "legacyRmse": 8.48514788080343,
+      "count": 86,
+      "rmse": 9.232061155164628,
+      "mae": 7.725093842675189,
+      "bias": 0.748556000295509,
+      "modelRmse": 11.306713636411507,
+      "modelMae": 8.836627906976746,
+      "legacyRmse": 9.232061155164628,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 15,
       "holdoutHours": 6
     },
     "ozone": {
-      "count": 48,
-      "rmse": 5.798182590276197,
-      "mae": 4.4127673183504,
-      "bias": -0.19703088444164518,
-      "modelRmse": 8.285906709588275,
-      "modelMae": 6.916666666666667,
-      "legacyRmse": 5.974783448993804,
+      "count": 45,
+      "rmse": 5.919093507187964,
+      "mae": 4.886310292945085,
+      "bias": -0.6129186215515767,
+      "modelRmse": 9.476579317219667,
+      "modelMae": 7.722222222222222,
+      "legacyRmse": 6.151147612168564,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 8,
       "holdoutHours": 6
     },
     "carbon_monoxide": {
       "count": 3,
-      "rmse": 161.73048568529063,
-      "mae": 156.16666666666666,
-      "bias": -156.16666666666666,
-      "modelRmse": 161.73048568529063,
-      "modelMae": 156.16666666666666,
+      "rmse": 67.84909726739185,
+      "mae": 48,
+      "bias": -29,
+      "modelRmse": 67.84909726739185,
+      "modelMae": 48,
       "method": "Insufficient monitors for nested calibration; CAMS retained"
     }
   },
   "configs": {
     "pm2_5": {
-      "lengthScaleKm": 5,
+      "lengthScaleKm": 15,
       "prior": 1,
       "gain": 1,
-      "referenceOnly": true
+      "referenceOnly": true,
+      "strategy": "weighted"
     },
     "pm10": {
-      "lengthScaleKm": 5,
-      "prior": 0.3,
-      "gain": 1,
-      "referenceOnly": true
+      "lengthScaleKm": 15,
+      "prior": 1,
+      "gain": 0
     },
     "nitrogen_dioxide": {
       "lengthScaleKm": 15,
       "prior": 1,
-      "gain": 0
+      "gain": 1,
+      "referenceOnly": true,
+      "strategy": "weighted"
     },
     "ozone": {
       "lengthScaleKm": 30,
