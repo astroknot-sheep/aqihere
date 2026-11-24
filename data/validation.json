@@ -1,89 +1,90 @@
 {
-  "generatedAt": "2026-11-24T06:25:14.046Z",
+  "generatedAt": "2026-11-24T18:00:00.948Z",
   "region": "Berlin region",
   "method": "Reference history uses separate chronological periods for fitting, choosing between correction methods and evaluating the result. Each target monitor and neighbours within 1 km are withheld. Sparse histories use nested spatial folds.",
   "metrics": {
     "pm2_5": {
-      "count": 72,
-      "rmse": 1.832327136477154,
-      "mae": 1.464281255732196,
-      "bias": 0.9981160881843698,
-      "modelRmse": 2.475792521822277,
-      "modelMae": 2.160416666666666,
-      "legacyRmse": 1.5530077269583067,
+      "count": 60,
+      "rmse": 2.480920824514326,
+      "mae": 2.103436311457109,
+      "bias": 0.6744892573791382,
+      "modelRmse": 3.2211216990359115,
+      "modelMae": 2.6241666666666665,
+      "legacyRmse": 2.345854834733612,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 12,
-      "holdoutHours": 6
+      "holdoutHours": 5
     },
     "pm10": {
-      "count": 72,
-      "rmse": 1.7203321384330754,
-      "mae": 1.416380440401972,
-      "bias": 0.4599793560214141,
-      "modelRmse": 2.1198794514992807,
-      "modelMae": 1.763888888888889,
-      "legacyRmse": 1.702258350061563,
+      "count": 60,
+      "rmse": 5.417583255782355,
+      "mae": 4.2775,
+      "bias": 1.2758333333333336,
+      "modelRmse": 5.417583255782355,
+      "modelMae": 4.2775,
+      "legacyRmse": 5.161697077951223,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 12,
-      "holdoutHours": 6
+      "holdoutHours": 5
     },
     "nitrogen_dioxide": {
-      "count": 90,
-      "rmse": 4.720990362201558,
-      "mae": 3.260555555555555,
-      "bias": -1.6027777777777772,
-      "modelRmse": 4.720990362201558,
-      "modelMae": 3.260555555555555,
-      "legacyRmse": 4.685394536988701,
+      "count": 75,
+      "rmse": 8.809225448695555,
+      "mae": 7.219131388040384,
+      "bias": 2.179346586504667,
+      "modelRmse": 10.775973273908951,
+      "modelMae": 8.537333333333336,
+      "legacyRmse": 7.907364294979458,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 15,
-      "holdoutHours": 6
+      "holdoutHours": 5
     },
     "ozone": {
-      "count": 48,
-      "rmse": 3.682068102591846,
-      "mae": 2.79043969641655,
-      "bias": -0.10046214856150189,
-      "modelRmse": 4.68430446633578,
-      "modelMae": 3.2395833333333335,
-      "legacyRmse": 3.582140071798552,
+      "count": 40,
+      "rmse": 6.999751760031062,
+      "mae": 5.254861909029816,
+      "bias": -1.4223754225346632,
+      "modelRmse": 10.792068847074688,
+      "modelMae": 7.6875,
+      "legacyRmse": 6.999751760031061,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 8,
-      "holdoutHours": 6
+      "holdoutHours": 5
     },
     "carbon_monoxide": {
       "count": 3,
-      "rmse": 60.35588896978764,
-      "mae": 39.666666666666664,
-      "bias": -39.666666666666664,
-      "modelRmse": 60.35588896978764,
-      "modelMae": 39.666666666666664,
+      "rmse": 74.49720352693336,
+      "mae": 57.333333333333336,
+      "bias": 57.333333333333336,
+      "modelRmse": 74.49720352693336,
+      "modelMae": 57.333333333333336,
       "method": "Insufficient monitors for nested calibration; CAMS retained"
     }
   },
   "configs": {
     "pm2_5": {
       "lengthScaleKm": 5,
-      "prior": 1,
+      "prior": 0.3,
       "gain": 1,
       "referenceOnly": true
     },
     "pm10": {
-      "lengthScaleKm": 5,
-      "prior": 0.3,
-      "gain": 1,
-      "referenceOnly": true
-    },
-    "nitrogen_dioxide": {
       "lengthScaleKm": 15,
       "prior": 1,
       "gain": 0
     },
-    "ozone": {
-      "lengthScaleKm": 15,
-      "prior": 0.3,
+    "nitrogen_dioxide": {
+      "lengthScaleKm": 5,
+      "prior": 3,
       "gain": 1,
       "referenceOnly": true
+    },
+    "ozone": {
+      "lengthScaleKm": 15,
+      "prior": 1,
+      "gain": 1,
+      "referenceOnly": true,
+      "strategy": "weighted"
     },
     "sulphur_dioxide": {
       "lengthScaleKm": 15,
@@ -96,5 +97,5 @@
       "gain": 0
     }
   },
-  "historyHours": 26
+  "historyHours": 25
 }
