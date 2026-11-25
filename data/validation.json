@@ -1,69 +1,69 @@
 {
-  "generatedAt": "2026-11-24T18:00:00.948Z",
+  "generatedAt": "2026-11-25T02:13:09.446Z",
   "region": "Berlin region",
   "method": "Reference history uses separate chronological periods for fitting, choosing between correction methods and evaluating the result. Each target monitor and neighbours within 1 km are withheld. Sparse histories use nested spatial folds.",
   "metrics": {
     "pm2_5": {
       "count": 60,
-      "rmse": 2.480920824514326,
-      "mae": 2.103436311457109,
-      "bias": 0.6744892573791382,
-      "modelRmse": 3.2211216990359115,
-      "modelMae": 2.6241666666666665,
-      "legacyRmse": 2.345854834733612,
+      "rmse": 3.2997885895627563,
+      "mae": 2.6664587213737088,
+      "bias": 0.7297083214589596,
+      "modelRmse": 10.603875077850864,
+      "modelMae": 10.198333333333336,
+      "legacyRmse": 3.733758834693555,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 12,
       "holdoutHours": 5
     },
     "pm10": {
       "count": 60,
-      "rmse": 5.417583255782355,
-      "mae": 4.2775,
-      "bias": 1.2758333333333336,
-      "modelRmse": 5.417583255782355,
-      "modelMae": 4.2775,
-      "legacyRmse": 5.161697077951223,
+      "rmse": 4.504753456920052,
+      "mae": 3.682874909370571,
+      "bias": 1.9598448928674006,
+      "modelRmse": 13.01534831138478,
+      "modelMae": 12.450833333333334,
+      "legacyRmse": 4.504753456920052,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 12,
       "holdoutHours": 5
     },
     "nitrogen_dioxide": {
       "count": 75,
-      "rmse": 8.809225448695555,
-      "mae": 7.219131388040384,
-      "bias": 2.179346586504667,
-      "modelRmse": 10.775973273908951,
-      "modelMae": 8.537333333333336,
-      "legacyRmse": 7.907364294979458,
+      "rmse": 8.121211902168897,
+      "mae": 6.596754496915337,
+      "bias": 3.3252674635066097,
+      "modelRmse": 23.769685175309604,
+      "modelMae": 22.55066666666666,
+      "legacyRmse": 8.121211902168898,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 15,
       "holdoutHours": 5
     },
     "ozone": {
       "count": 40,
-      "rmse": 6.999751760031062,
-      "mae": 5.254861909029816,
-      "bias": -1.4223754225346632,
-      "modelRmse": 10.792068847074688,
-      "modelMae": 7.6875,
-      "legacyRmse": 6.999751760031061,
+      "rmse": 12.001001648539962,
+      "mae": 9.360317799840654,
+      "bias": -5.256565885273264,
+      "modelRmse": 22.114050963132016,
+      "modelMae": 19.3125,
+      "legacyRmse": 12.00100164853996,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 8,
       "holdoutHours": 5
     },
     "carbon_monoxide": {
       "count": 3,
-      "rmse": 74.49720352693336,
-      "mae": 57.333333333333336,
-      "bias": 57.333333333333336,
-      "modelRmse": 74.49720352693336,
-      "modelMae": 57.333333333333336,
+      "rmse": 188.991622389283,
+      "mae": 185.33333333333334,
+      "bias": 185.33333333333334,
+      "modelRmse": 188.991622389283,
+      "modelMae": 185.33333333333334,
       "method": "Insufficient monitors for nested calibration; CAMS retained"
     }
   },
   "configs": {
     "pm2_5": {
-      "lengthScaleKm": 5,
+      "lengthScaleKm": 15,
       "prior": 0.3,
       "gain": 1,
       "referenceOnly": true
@@ -71,13 +71,16 @@
     "pm10": {
       "lengthScaleKm": 15,
       "prior": 1,
-      "gain": 0
+      "gain": 1,
+      "referenceOnly": true,
+      "strategy": "weighted"
     },
     "nitrogen_dioxide": {
-      "lengthScaleKm": 5,
-      "prior": 3,
+      "lengthScaleKm": 15,
+      "prior": 1,
       "gain": 1,
-      "referenceOnly": true
+      "referenceOnly": true,
+      "strategy": "weighted"
     },
     "ozone": {
       "lengthScaleKm": 15,
@@ -97,5 +100,5 @@
       "gain": 0
     }
   },
-  "historyHours": 25
+  "historyHours": 26
 }
