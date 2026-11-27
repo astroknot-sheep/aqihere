@@ -1,73 +1,72 @@
 {
-  "generatedAt": "2026-11-26T21:29:16.769Z",
+  "generatedAt": "2026-11-27T03:44:47.824Z",
   "region": "Berlin region",
   "method": "Reference history uses separate chronological periods for fitting, choosing between correction methods and evaluating the result. Each target monitor and neighbours within 1 km are withheld. Sparse histories use nested spatial folds.",
   "metrics": {
     "pm2_5": {
       "count": 72,
-      "rmse": 2.4072079369666564,
-      "mae": 2.057639713885968,
-      "bias": -0.25477017750078607,
-      "modelRmse": 3.5559271724200925,
-      "modelMae": 2.9451388888888896,
-      "legacyRmse": 2.4072079369666564,
+      "rmse": 2.194545347352934,
+      "mae": 1.9276135460963448,
+      "bias": -0.45691227886323993,
+      "modelRmse": 5.122557005810455,
+      "modelMae": 4.575694444444444,
+      "legacyRmse": 2.4327486207328057,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 12,
       "holdoutHours": 6
     },
     "pm10": {
       "count": 72,
-      "rmse": 3.5946862756565037,
-      "mae": 3.0551865619813108,
-      "bias": -0.5100628000998282,
-      "modelRmse": 5.452086119601886,
-      "modelMae": 4.340972222222223,
-      "legacyRmse": 3.5946862756565037,
+      "rmse": 3.1366209140606673,
+      "mae": 2.8466965953990853,
+      "bias": -0.7424849124567773,
+      "modelRmse": 6.240158918916514,
+      "modelMae": 5.481944444444441,
+      "legacyRmse": 3.1366209140606665,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 12,
       "holdoutHours": 6
     },
     "nitrogen_dioxide": {
       "count": 90,
-      "rmse": 6.147643541176861,
-      "mae": 4.454070208447344,
-      "bias": 1.035257229754454,
-      "modelRmse": 6.6477105499228495,
-      "modelMae": 4.954444444444443,
-      "legacyRmse": 6.292228678401523,
+      "rmse": 3.4379983574491435,
+      "mae": 2.3198946835682808,
+      "bias": -0.0015361865028475621,
+      "modelRmse": 5.247007083407962,
+      "modelMae": 4.01611111111111,
+      "legacyRmse": 3.445257620482451,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 15,
       "holdoutHours": 6
     },
     "ozone": {
       "count": 48,
-      "rmse": 5.691201434543131,
-      "mae": 4.34651719203267,
-      "bias": 0.43928434899153085,
-      "modelRmse": 5.718664616848937,
-      "modelMae": 4.21875,
-      "legacyRmse": 5.5995483180674785,
+      "rmse": 11.003787226829376,
+      "mae": 9.395833333333334,
+      "bias": 8.3125,
+      "modelRmse": 11.003787226829376,
+      "modelMae": 9.395833333333334,
+      "legacyRmse": 6.557479981831643,
       "method": "Later-hour reference holdout with each target station and its 1 km neighbours excluded",
       "referenceCount": 8,
       "holdoutHours": 6
     },
     "carbon_monoxide": {
       "count": 3,
-      "rmse": 31.002688055500393,
-      "mae": 28,
-      "bias": -28,
-      "modelRmse": 31.002688055500393,
-      "modelMae": 28,
+      "rmse": 48.68778080791935,
+      "mae": 38.666666666666664,
+      "bias": -15,
+      "modelRmse": 48.68778080791935,
+      "modelMae": 38.666666666666664,
       "method": "Insufficient monitors for nested calibration; CAMS retained"
     }
   },
   "configs": {
     "pm2_5": {
-      "lengthScaleKm": 15,
-      "prior": 1,
+      "lengthScaleKm": 5,
+      "prior": 0.3,
       "gain": 1,
-      "referenceOnly": true,
-      "strategy": "weighted"
+      "referenceOnly": true
     },
     "pm10": {
       "lengthScaleKm": 15,
@@ -84,9 +83,8 @@
     },
     "ozone": {
       "lengthScaleKm": 15,
-      "prior": 0.3,
-      "gain": 1,
-      "referenceOnly": true
+      "prior": 1,
+      "gain": 0
     },
     "sulphur_dioxide": {
       "lengthScaleKm": 15,
